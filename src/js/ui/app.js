@@ -44,6 +44,7 @@ const phaseNotice = document.getElementById('phase-notice');
 const phaseNoticeText = document.getElementById('phase-notice-text');
 
 // Results Panel Elements
+const chordAnalysisSection = document.getElementById('chord-analysis-section');
 const analysisStatusBadge = document.getElementById('analysis-status-badge');
 const resultsEmptyState = document.getElementById('results-empty-state');
 const resultsProgressState = document.getElementById('results-progress-state');
@@ -82,6 +83,9 @@ let activeSegmentIndex = -1;
  */
 function init() {
   setupEventListeners();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.add('hidden');
+  }
   updateUiState();
 }
 
@@ -227,6 +231,9 @@ async function handleFileSelection(file) {
   hideAlert();
   hidePhaseNotice();
   resetResultsView();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.add('hidden');
+  }
 
   const validation = validateAudioFile(file);
   if (!validation.valid) {
@@ -307,6 +314,9 @@ function resetFileSelection() {
   hideAlert();
   hidePhaseNotice();
   resetResultsView();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.add('hidden');
+  }
   updateUiState();
   announceStatus('Audio file cleared.');
 }
@@ -358,6 +368,14 @@ async function handleAnalyzeAudio() {
   updateStatusBadge('Analyzing...', 'bg-purple-900/60 text-purple-300');
   announceStatus('Starting audio chromagram extraction and chord detection...');
 
+  // Show Chord Analysis section and smoothly auto scroll screen to it
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      chordAnalysisSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   const frameSize = 8192;
   const hopSize = 4096;
   const hopDuration = hopSize / sampleRate;
@@ -382,6 +400,9 @@ async function handleAnalyzeAudio() {
 
     if (analysisCancelled) {
       resetResultsView();
+      if (chordAnalysisSection) {
+        chordAnalysisSection.classList.add('hidden');
+      }
       updateStatusBadge('Cancelled', 'bg-slate-800 text-slate-400');
       announceStatus('Audio analysis was cancelled.');
       return;
@@ -418,6 +439,9 @@ async function handleAnalyzeAudio() {
   } catch (err) {
     if (analysisCancelled) {
       resetResultsView();
+      if (chordAnalysisSection) {
+        chordAnalysisSection.classList.add('hidden');
+      }
       updateStatusBadge('Cancelled', 'bg-slate-800 text-slate-400');
       announceStatus('Analysis cancelled.');
       return;
@@ -437,6 +461,9 @@ function handleCancelAnalysis() {
   analysisCancelled = true;
   isProcessing = false;
   resetResultsView();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.add('hidden');
+  }
   updateStatusBadge('Ready', 'bg-slate-800 text-slate-300');
   updateUiState();
 }
@@ -447,6 +474,9 @@ function handleCancelAnalysis() {
  */
 function renderResults(segments) {
   hideAllResultsStates();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.remove('hidden');
+  }
   if (resultsActiveState) resultsActiveState.classList.remove('hidden');
 
   if (!segments || segments.length === 0) {
@@ -700,6 +730,9 @@ function resetResultsView() {
  */
 function showProgressState() {
   hideAllResultsStates();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.remove('hidden');
+  }
   if (resultsProgressState) resultsProgressState.classList.remove('hidden');
 }
 
@@ -709,6 +742,9 @@ function showProgressState() {
  */
 function showErrorState(errorMsg) {
   hideAllResultsStates();
+  if (chordAnalysisSection) {
+    chordAnalysisSection.classList.remove('hidden');
+  }
   if (resultsErrorState) resultsErrorState.classList.remove('hidden');
   if (analysisErrorText) analysisErrorText.textContent = errorMsg;
   updateStatusBadge('Error', 'bg-red-900/60 text-red-300');

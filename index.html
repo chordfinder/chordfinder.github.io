@@ -104,351 +104,347 @@
       </div>
     </div>
 
-    <!-- Workspace Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- Workspace Flow: Upload -> Chord Analysis -> Info -->
+    <div class="max-w-4xl mx-auto space-y-8">
 
-      <!-- Left Column: Audio Upload & Player (7 cols) -->
-      <section class="lg:col-span-7 space-y-6">
+      <!-- 1. Audio Upload & Player Section -->
+      <section id="audio-upload-section" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8 shadow-xl backdrop-blur-sm space-y-5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Audio File Upload
+          </h2>
+          <span class="text-xs text-slate-400">Max size: 50 MB</span>
+        </div>
 
-        <!-- Upload Panel Card -->
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur-sm space-y-5">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-              <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Audio File Upload
-            </h2>
-            <span class="text-xs text-slate-400">Max size: 50 MB</span>
-          </div>
-
-          <!-- Drag and Drop Box -->
-          <div
-            id="drop-zone"
-            tabindex="0"
-            role="button"
-            aria-label="Upload audio file drop area. Click or press enter to browse files."
-            class="relative border-2 border-dashed border-slate-700/80 hover:border-purple-500/80 bg-slate-900/40 hover:bg-purple-950/10 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent group"
+        <!-- Drag and Drop Box -->
+        <div
+          id="drop-zone"
+          tabindex="0"
+          role="button"
+          aria-label="Upload audio file drop area. Click or press enter to browse files."
+          class="relative border-2 border-dashed border-slate-700/80 hover:border-purple-500/80 bg-slate-900/40 hover:bg-purple-950/10 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent group"
+        >
+          <!-- Hidden native file input -->
+          <input
+            type="file"
+            id="file-input"
+            class="sr-only"
+            accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm"
           >
-            <!-- Hidden native file input -->
-            <input
-              type="file"
-              id="file-input"
-              class="sr-only"
-              accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm"
-            >
 
-            <!-- Empty State Illustration -->
-            <div id="empty-upload-state" class="space-y-4">
-              <div class="w-14 h-14 mx-auto rounded-full bg-purple-950/60 border border-purple-800/40 flex items-center justify-center text-purple-400 group-hover:scale-110 group-hover:text-purple-300 transition-transform">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                </svg>
-              </div>
-              <div class="space-y-1">
-                <p class="text-sm font-medium text-slate-200">
-                  Drag &amp; drop your audio track here
-                </p>
-                <p class="text-xs text-slate-400">
-                  or click to select from your device
-                </p>
-              </div>
-              <div class="pt-2">
-                <button
-                  type="button"
-                  id="browse-btn"
-                  class="inline-flex items-center px-4 py-2 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-900/30 transition-colors focus:ring-2 focus:ring-purple-400 focus:outline-none"
-                >
-                  Browse Files
-                </button>
-              </div>
-              <p class="text-[11px] text-slate-400 tracking-wide">
-                Supports MP3, WAV, FLAC, OGG, M4A, AAC
+          <!-- Empty State Illustration -->
+          <div id="empty-upload-state" class="space-y-4">
+            <div class="w-14 h-14 mx-auto rounded-full bg-purple-950/60 border border-purple-800/40 flex items-center justify-center text-purple-400 group-hover:scale-110 group-hover:text-purple-300 transition-transform">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-slate-200">
+                Drag &amp; drop your audio track here
+              </p>
+              <p class="text-xs text-slate-400">
+                or click to select from your device
               </p>
             </div>
+            <div class="pt-2">
+              <button
+                type="button"
+                id="browse-btn"
+                class="inline-flex items-center px-4 py-2 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-900/30 transition-colors focus:ring-2 focus:ring-purple-400 focus:outline-none"
+              >
+                Browse Files
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-400 tracking-wide">
+              Supports MP3, WAV, FLAC, OGG, M4A, AAC
+            </p>
+          </div>
 
-            <!-- Loaded File Card (Hidden until file selected) -->
-            <div id="file-card" class="hidden text-left space-y-4">
-              <div class="flex items-start justify-between gap-3 p-3.5 rounded-lg bg-slate-950/80 border border-slate-800">
-                <div class="flex items-center gap-3 overflow-hidden">
-                  <div class="p-2.5 rounded-lg bg-purple-950 border border-purple-800/50 text-purple-400 shrink-0">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
-                    </svg>
-                  </div>
-                  <div class="overflow-hidden">
-                    <h3 id="file-name" class="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
-                      audio-file.mp3
-                    </h3>
-                    <p id="file-size" class="text-xs text-slate-400">0.0 MB</p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  id="remove-file-btn"
-                  class="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-colors"
-                  title="Remove file"
-                  aria-label="Remove audio file"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          <!-- Loaded File Card (Hidden until file selected) -->
+          <div id="file-card" class="hidden text-left space-y-4">
+            <div class="flex items-start justify-between gap-3 p-3.5 rounded-lg bg-slate-950/80 border border-slate-800">
+              <div class="flex items-center gap-3 overflow-hidden">
+                <div class="p-2.5 rounded-lg bg-purple-950 border border-purple-800/50 text-purple-400 shrink-0">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
                   </svg>
-                </button>
+                </div>
+                <div class="overflow-hidden">
+                  <h3 id="file-name" class="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
+                    audio-file.mp3
+                  </h3>
+                  <p id="file-size" class="text-xs text-slate-400">0.0 MB</p>
+                </div>
               </div>
 
-              <!-- Metadata Grid -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
-                  <span class="block text-slate-400 text-[11px]">Format</span>
-                  <span id="file-format" class="font-medium text-slate-200 truncate block">Audio</span>
-                </div>
-                <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
-                  <span class="block text-slate-400 text-[11px]">Duration</span>
-                  <span id="audio-duration" class="font-medium text-slate-200 block">--:--</span>
-                </div>
-                <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
-                  <span class="block text-slate-400 text-[11px]">Sample Rate</span>
-                  <span id="audio-samplerate" class="font-medium text-slate-200 block">--</span>
-                </div>
-                <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
-                  <span class="block text-slate-400 text-[11px]">Channels</span>
-                  <span id="audio-channels" class="font-medium text-slate-200 block">--</span>
-                </div>
+              <button
+                type="button"
+                id="remove-file-btn"
+                class="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-colors"
+                title="Remove file"
+                aria-label="Remove audio file"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Metadata Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
+                <span class="block text-slate-400 text-[11px]">Format</span>
+                <span id="file-format" class="font-medium text-slate-200 truncate block">Audio</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
+                <span class="block text-slate-400 text-[11px]">Duration</span>
+                <span id="audio-duration" class="font-medium text-slate-200 block">--:--</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
+                <span class="block text-slate-400 text-[11px]">Sample Rate</span>
+                <span id="audio-samplerate" class="font-medium text-slate-200 block">--</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/60">
+                <span class="block text-slate-400 text-[11px]">Channels</span>
+                <span id="audio-channels" class="font-medium text-slate-200 block">--</span>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Native Audio Preview Player -->
-          <div id="audio-preview-card" class="hidden space-y-2 pt-2 border-t border-slate-800">
-            <div class="flex items-center justify-between">
-              <label for="audio-player" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Audio Preview Player
-              </label>
-              <span id="player-seek-tip" class="text-[11px] text-purple-400 hidden sm:inline">
-                Click any chord below to seek
-              </span>
+        <!-- Native Audio Preview Player -->
+        <div id="audio-preview-card" class="hidden space-y-2 pt-2 border-t border-slate-800">
+          <div class="flex items-center justify-between">
+            <label for="audio-player" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Audio Preview Player
+            </label>
+            <span id="player-seek-tip" class="text-[11px] text-purple-400 hidden sm:inline">
+              Click any chord below to seek
+            </span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+            <audio id="audio-player" controls class="w-full h-10 accent-purple-500 rounded focus:outline-none focus:ring-2 focus:ring-purple-500">
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="pt-2">
+          <button
+            type="button"
+            id="analyze-btn"
+            disabled
+            class="w-full flex items-center justify-center py-3.5 px-6 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-800 bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/30 focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
+            <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+            </svg>
+            Analyze Audio
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Chord Analysis Section (Positioned directly below upload box, hidden by default) -->
+      <section id="chord-analysis-section" class="hidden scroll-mt-20 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8 shadow-xl backdrop-blur-sm space-y-6 transition-all duration-300">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+            Chord Analysis
+          </h2>
+          <span id="analysis-status-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+            Ready
+          </span>
+        </div>
+
+        <!-- 1. Empty Results Placeholder State -->
+        <div id="results-empty-state" class="hidden space-y-6 py-6 text-center">
+          <div class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-purple-950/60 to-slate-900 border border-purple-800/30 flex items-center justify-center text-purple-400/80 shadow-inner">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12h1m3 0h1m3 0h1m3 0h1m3 0h1m3 0h1M4 12c1-6 2-6 3 0s2 6 3 0 2-6 3 0 2 6 3 0 2-6 3 0 2 6 3 0" />
+            </svg>
+          </div>
+
+          <div class="space-y-2 max-w-xs mx-auto">
+            <h3 class="text-sm font-semibold text-slate-200">
+              Awaiting Audio Analysis
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Upload an audio file and click <strong class="text-slate-300">Analyze Audio</strong>. The FFT spectrum and 12-bin chroma features will be computed locally in your browser.
+            </p>
+          </div>
+
+          <!-- Features Overview -->
+          <div class="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/40 text-left space-y-3">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Phase 2 Engine Pipeline</span>
+              <span class="text-purple-400 font-normal">Active</span>
             </div>
-            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
-              <audio id="audio-player" controls class="w-full h-10 accent-purple-500 rounded focus:outline-none focus:ring-2 focus:ring-purple-500">
-                Your browser does not support the audio element.
-              </audio>
+            <ul class="text-xs text-slate-400 space-y-2">
+              <li class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                <span>Radix-2 Cooley-Tukey FFT with Hann windowing</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                <span>12-bin Chromagram pitch-class distribution</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                <span>24 Major &amp; Minor chord template correlation</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                <span>Temporal smoothing &amp; interactive playback seeking</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 2. Active Progress State (Hidden by default) -->
+        <div id="results-progress-state" class="hidden space-y-5 py-6">
+          <div class="text-center space-y-3">
+            <div class="w-14 h-14 mx-auto rounded-full bg-purple-950/80 border border-purple-700/50 flex items-center justify-center text-purple-300 animate-pulse">
+              <svg class="w-7 h-7 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-white">Analyzing Audio Frames</h3>
+              <p id="progress-status-label" class="text-xs text-slate-400 mt-1">
+                Computing FFT spectrum and chroma vectors...
+              </p>
             </div>
           </div>
 
-          <!-- Action Button -->
-          <div class="pt-2">
+          <!-- Progress Bar -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs text-slate-400">
+              <span id="progress-percentage-text">0%</span>
+              <span id="progress-frames-text">0 / 0 frames</span>
+            </div>
+            <div class="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+              <div
+                id="progress-fill"
+                class="bg-gradient-to-r from-purple-600 to-indigo-500 h-2.5 rounded-full transition-all duration-150"
+                style="width: 0%"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Cancellation Button -->
+          <div class="text-center pt-2">
             <button
               type="button"
-              id="analyze-btn"
-              disabled
-              class="w-full flex items-center justify-center py-3.5 px-6 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-800 bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/30 focus:outline-none focus:ring-2 focus:ring-purple-400"
+              id="cancel-analysis-btn"
+              class="px-4 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
             >
-              <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
-              </svg>
-              Analyze Audio
+              Cancel Analysis
             </button>
           </div>
         </div>
 
+        <!-- 3. Completed Results State (Hidden by default) -->
+        <div id="results-active-state" class="hidden space-y-5">
+          <!-- Summary Metrics Header -->
+          <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400 font-medium">Detected Chords</span>
+              <span id="summary-segments-count" class="font-semibold text-purple-300">0 segments</span>
+            </div>
+            <div id="unique-chords-container" class="flex flex-wrap gap-1.5 pt-1">
+              <!-- Populated dynamically with unique chord chips -->
+            </div>
+          </div>
+
+          <!-- Interactive Timeline Visualizer -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span class="font-medium text-slate-300">Synchronized Timeline</span>
+              <span class="text-[11px] text-slate-400">Click to seek audio</span>
+            </div>
+            <div
+              id="timeline-bar"
+              class="w-full h-10 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex cursor-pointer relative"
+              title="Click any segment to jump to that timestamp in the audio player"
+            >
+              <!-- Populated dynamically with colored segment blocks -->
+            </div>
+          </div>
+
+          <!-- Detailed Chord Segments List -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span class="font-medium text-slate-300">Chord Progression Sequence</span>
+              <span id="timeline-current-time" class="font-mono text-purple-400 text-[11px]">00:00</span>
+            </div>
+            <div
+              id="chord-segments-list"
+              class="max-h-80 overflow-y-auto space-y-2 pr-1 custom-scrollbar"
+              role="list"
+              aria-label="Detected chord segments list"
+            >
+              <!-- Populated dynamically with chord cards -->
+            </div>
+          </div>
+
+          <!-- Estimation Disclaimer -->
+          <div class="p-3.5 rounded-lg bg-slate-950/50 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+            <span class="font-medium text-slate-300">Estimation Notice:</span> Results are mathematical estimates derived from 12-bin chroma template correlation. Similarity scores reflect spectral template alignment and are not calibrated certainty guarantees.
+          </div>
+        </div>
+
+        <!-- 4. Error Retry State (Hidden by default) -->
+        <div id="results-error-state" class="hidden space-y-4 py-6 text-center">
+          <div class="w-12 h-12 mx-auto rounded-full bg-red-950/60 border border-red-800/50 flex items-center justify-center text-red-400">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-sm font-semibold text-white">Analysis Could Not Complete</h3>
+            <p id="analysis-error-text" class="text-xs text-red-300/90 max-w-xs mx-auto">
+              An error occurred during audio processing.
+            </p>
+          </div>
+          <div>
+            <button
+              type="button"
+              id="retry-analysis-btn"
+              class="px-4 py-2 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow transition-colors"
+            >
+              Retry Analysis
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 3. Technical Foundation & Privacy Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Privacy & Processing Notes -->
-        <div class="p-4 rounded-xl border border-slate-800/80 bg-slate-900/30 text-xs text-slate-400 space-y-2">
-          <div class="flex items-center gap-2 text-slate-300 font-medium">
+        <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 text-xs text-slate-400 space-y-2.5">
+          <div class="flex items-center gap-2 text-slate-300 font-medium text-sm">
             <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
             100% Client-Side Privacy
           </div>
-          <p>
+          <p class="leading-relaxed">
             Audio files are processed strictly in your local browser memory using the Web Audio API and custom in-memory DSP algorithms. No audio data leaves your machine.
           </p>
         </div>
 
-      </section>
-
-      <!-- Right Column: Results & Chord Display Panel (5 cols) -->
-      <section class="lg:col-span-5 space-y-6">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur-sm space-y-5">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-              <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-              Chord Analysis
-            </h2>
-            <span id="analysis-status-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
-              Ready
-            </span>
-          </div>
-
-          <!-- 1. Empty Results Placeholder State -->
-          <div id="results-empty-state" class="space-y-6 py-6 text-center">
-            <div class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-purple-950/60 to-slate-900 border border-purple-800/30 flex items-center justify-center text-purple-400/80 shadow-inner">
-              <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12h1m3 0h1m3 0h1m3 0h1m3 0h1m3 0h1M4 12c1-6 2-6 3 0s2 6 3 0 2-6 3 0 2 6 3 0 2-6 3 0 2 6 3 0" />
-              </svg>
-            </div>
-
-            <div class="space-y-2 max-w-xs mx-auto">
-              <h3 class="text-sm font-semibold text-slate-200">
-                Awaiting Audio Analysis
-              </h3>
-              <p class="text-xs text-slate-400 leading-relaxed">
-                Upload an audio file and click <strong class="text-slate-300">Analyze Audio</strong>. The FFT spectrum and 12-bin chroma features will be computed locally in your browser.
-              </p>
-            </div>
-
-            <!-- Features Overview -->
-            <div class="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/40 text-left space-y-3">
-              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                <span>Phase 2 Engine Pipeline</span>
-                <span class="text-purple-400 font-normal">Active</span>
-              </div>
-              <ul class="text-xs text-slate-400 space-y-2">
-                <li class="flex items-center gap-2">
-                  <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  <span>Radix-2 Cooley-Tukey FFT with Hann windowing</span>
-                </li>
-                <li class="flex items-center gap-2">
-                  <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  <span>12-bin Chromagram pitch-class distribution</span>
-                </li>
-                <li class="flex items-center gap-2">
-                  <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  <span>24 Major &amp; Minor chord template correlation</span>
-                </li>
-                <li class="flex items-center gap-2">
-                  <div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  <span>Temporal smoothing &amp; interactive playback seeking</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- 2. Active Progress State (Hidden by default) -->
-          <div id="results-progress-state" class="hidden space-y-5 py-6">
-            <div class="text-center space-y-3">
-              <div class="w-14 h-14 mx-auto rounded-full bg-purple-950/80 border border-purple-700/50 flex items-center justify-center text-purple-300 animate-pulse">
-                <svg class="w-7 h-7 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold text-white">Analyzing Audio Frames</h3>
-                <p id="progress-status-label" class="text-xs text-slate-400 mt-1">
-                  Computing FFT spectrum and chroma vectors...
-                </p>
-              </div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="space-y-2">
-              <div class="flex justify-between text-xs text-slate-400">
-                <span id="progress-percentage-text">0%</span>
-                <span id="progress-frames-text">0 / 0 frames</span>
-              </div>
-              <div class="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
-                <div
-                  id="progress-fill"
-                  class="bg-gradient-to-r from-purple-600 to-indigo-500 h-2.5 rounded-full transition-all duration-150"
-                  style="width: 0%"
-                ></div>
-              </div>
-            </div>
-
-            <!-- Cancellation Button -->
-            <div class="text-center pt-2">
-              <button
-                type="button"
-                id="cancel-analysis-btn"
-                class="px-4 py-2 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-              >
-                Cancel Analysis
-              </button>
-            </div>
-          </div>
-
-          <!-- 3. Completed Results State (Hidden by default) -->
-          <div id="results-active-state" class="hidden space-y-5">
-            <!-- Summary Metrics Header -->
-            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-              <div class="flex items-center justify-between text-xs">
-                <span class="text-slate-400">Detected Chords</span>
-                <span id="summary-segments-count" class="font-semibold text-purple-300">0 segments</span>
-              </div>
-              <div id="unique-chords-container" class="flex flex-wrap gap-1.5 pt-1">
-                <!-- Populated dynamically with unique chord chips -->
-              </div>
-            </div>
-
-            <!-- Interactive Timeline Visualizer -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between text-xs text-slate-400">
-                <span class="font-medium text-slate-300">Synchronized Timeline</span>
-                <span class="text-[11px] text-slate-400">Click to seek audio</span>
-              </div>
-              <div
-                id="timeline-bar"
-                class="w-full h-9 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex cursor-pointer relative"
-                title="Click any segment to jump to that timestamp in the audio player"
-              >
-                <!-- Populated dynamically with colored segment blocks -->
-              </div>
-            </div>
-
-            <!-- Detailed Chord Segments List -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between text-xs text-slate-400">
-                <span class="font-medium text-slate-300">Chord Progression Sequence</span>
-                <span id="timeline-current-time" class="font-mono text-purple-400 text-[11px]">00:00</span>
-              </div>
-              <div
-                id="chord-segments-list"
-                class="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar"
-                role="list"
-                aria-label="Detected chord segments list"
-              >
-                <!-- Populated dynamically with chord cards -->
-              </div>
-            </div>
-
-            <!-- Estimation Disclaimer -->
-            <div class="p-3 rounded-lg bg-slate-950/50 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
-              <span class="font-medium text-slate-300">Estimation Notice:</span> Results are mathematical estimates derived from 12-bin chroma template correlation. Similarity scores reflect spectral template alignment and are not calibrated certainty guarantees.
-            </div>
-          </div>
-
-          <!-- 4. Error Retry State (Hidden by default) -->
-          <div id="results-error-state" class="hidden space-y-4 py-6 text-center">
-            <div class="w-12 h-12 mx-auto rounded-full bg-red-950/60 border border-red-800/50 flex items-center justify-center text-red-400">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div class="space-y-1">
-              <h3 class="text-sm font-semibold text-white">Analysis Could Not Complete</h3>
-              <p id="analysis-error-text" class="text-xs text-red-300/90 max-w-xs mx-auto">
-                An error occurred during audio processing.
-              </p>
-            </div>
-            <div>
-              <button
-                type="button"
-                id="retry-analysis-btn"
-                class="px-4 py-2 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow transition-colors"
-              >
-                Retry Analysis
-              </button>
-            </div>
-          </div>
-
-        </div>
-
         <!-- Technical Specification Card -->
-        <div class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-5 space-y-3 text-xs">
-          <h3 class="font-semibold text-slate-300">Technical Foundation</h3>
+        <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-3 text-xs">
+          <h3 class="font-semibold text-slate-300 text-sm">Technical Foundation</h3>
           <div class="space-y-1.5 text-slate-400">
             <div class="flex justify-between py-1 border-b border-slate-800/60">
               <span>Architecture</span>
@@ -468,7 +464,7 @@
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
     </div>
 
