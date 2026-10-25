@@ -1,0 +1,29 @@
+{
+  "fileName": "synthetic_c_g_am.wav",
+  "category": "synthetic_benchmark",
+  "sampleRate": 44100,
+  "duration": 4.5,
+  "segments": [
+    {
+      "startTime": 0,
+      "endTime": 1.5,
+      "chord": "C Major",
+      "root": "C",
+      "quality": "major"
+    },
+    {
+      "startTime": 1.5,
+      "endTime": 3,
+      "chord": "G Major",
+      "root": "G",
+      "quality": "major"
+    },
+    {
+      "startTime": 3,
+      "endTime": 4.5,
+      "chord": "A Minor",
+      "root": "A",
+      "quality": "minor"
+    }
+  ]
+}
