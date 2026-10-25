@@ -48,7 +48,22 @@
         </div>
       </div>
 
-      <nav class="flex items-center gap-4 text-xs sm:text-sm text-slate-400">
+      <nav class="flex items-center gap-3 text-xs sm:text-sm text-slate-400">
+        <button
+          type="button"
+          id="diagnostic-toggle-btn"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-700/70 text-slate-300 hover:text-white transition-colors cursor-pointer text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+          title="Toggle Diagnostic Engine Mode"
+          aria-pressed="false"
+        >
+          <svg class="w-3.5 h-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>Diagnostics</span>
+          <span id="diagnostic-toggle-status" class="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-400 font-mono">OFF</span>
+        </button>
+
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           Web Audio Ready
@@ -400,6 +415,293 @@
             <span class="font-medium text-slate-300">Estimation Notice:</span> Results are mathematical estimates derived from 12-bin chroma template correlation. Similarity scores reflect spectral template alignment and are not calibrated certainty guarantees.
           </div>
         </div>
+
+        <!-- 5. Diagnostic Inspector Panel (Hidden by default; toggled via Diagnostic Mode) -->
+        <section id="diagnostic-panel" class="hidden rounded-2xl border border-purple-800/60 bg-slate-950/95 p-5 sm:p-6 shadow-2xl backdrop-blur-md space-y-6 mt-6 transition-all animate-in fade-in">
+          <!-- Diagnostic Header & Navigation Controls -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="p-1 rounded bg-purple-950 text-purple-400 border border-purple-800/60">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </span>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">
+                  Frame-Level DSP Diagnostic Inspector
+                </h3>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800/50 font-mono">
+                  DEV MODE
+                </span>
+              </div>
+              <p class="text-xs text-slate-400">
+                Detailed spectral decomposition, 12-bin chroma vector, and template decision trace for every analysis frame.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                <input type="checkbox" id="diag-follow-playback" checked class="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-purple-500 accent-purple-600">
+                <span>Follow Player</span>
+              </label>
+              <button
+                type="button"
+                id="diag-export-json-btn"
+                class="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+                title="Export current frame diagnostics to JSON"
+              >
+                Export Frame JSON
+              </button>
+            </div>
+          </div>
+
+          <!-- Frame Navigation Scrubber Bar -->
+          <div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="text-slate-400 font-medium">Selected Frame:</span>
+                <span id="diag-frame-index" class="font-mono font-bold text-purple-300">#0</span>
+                <span class="text-slate-400">/</span>
+                <span id="diag-total-frames" class="font-mono text-slate-400">0</span>
+                <span class="text-slate-400">•</span>
+                <span class="text-slate-400">Time:</span>
+                <span id="diag-timestamp" class="font-mono text-white font-semibold">0.00s</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  id="diag-prev-frame-btn"
+                  class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                  title="Previous Frame"
+                  aria-label="Previous Frame"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  id="diag-next-frame-btn"
+                  class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                  title="Next Frame"
+                  aria-label="Next Frame"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Frame Range Slider -->
+            <input
+              type="range"
+              id="diag-frame-slider"
+              min="0"
+              max="0"
+              value="0"
+              class="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-purple-500"
+              aria-label="Select analysis frame"
+            >
+
+            <!-- Quick Jump Problem Frame Jumpers -->
+            <div class="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+              <span class="text-slate-400">Quick Jump:</span>
+              <button type="button" id="diag-jump-smoothed-btn" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-purple-900/40 text-purple-300 border border-slate-700/60 transition-colors">
+                Smoothed Frame ↗
+              </button>
+              <button type="button" id="diag-jump-rejected-btn" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-red-900/40 text-red-300 border border-slate-700/60 transition-colors">
+                Rejected / N.C. ↗
+              </button>
+              <button type="button" id="diag-jump-ambiguous-btn" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-amber-900/40 text-amber-300 border border-slate-700/60 transition-colors">
+                Low Margin (Δ &lt; 0.10) ↗
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 1: Frame Decision & Energy Metrics Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <!-- RMS Energy -->
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1">
+              <span class="block text-slate-400 text-[11px] font-medium">RMS Energy</span>
+              <div class="flex items-baseline gap-2">
+                <span id="diag-rms-value" class="text-base font-mono font-bold text-white">0.0000</span>
+                <span class="text-[10px] text-slate-400 font-mono">(Thresh: 0.005)</span>
+              </div>
+              <div id="diag-silence-badge" class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800/40">
+                Active Sound
+              </div>
+            </div>
+
+            <!-- Final Decision -->
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1">
+              <span class="block text-slate-400 text-[11px] font-medium">Final Decision</span>
+              <div class="flex items-center gap-2">
+                <span id="diag-final-decision-badge" class="px-2 py-0.5 rounded text-xs font-bold font-mono bg-purple-950 text-purple-300 border border-purple-800/50 truncate max-w-full">
+                  Accepted: C Major
+                </span>
+              </div>
+              <div id="diag-chord-quality" class="text-[11px] text-slate-400">
+                Quality: major • Root: C
+              </div>
+            </div>
+
+            <!-- Temporal Smoothing Trace -->
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1 md:col-span-2">
+              <span class="block text-slate-400 text-[11px] font-medium">Temporal Smoothing State</span>
+              <div id="diag-smoothing-badge" class="text-xs font-medium text-slate-200">
+                Unchanged by smoothing (Raw: C Major)
+              </div>
+              <p id="diag-smoothing-details" class="text-[11px] text-slate-400 leading-snug">
+                Local temporal majority vote across ±2 neighbor frames (~460ms).
+              </p>
+            </div>
+          </div>
+
+          <!-- Decision & Rejection Reason Banner -->
+          <div id="diag-reason-banner" class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 text-xs space-y-1">
+            <span class="block font-semibold text-slate-300 text-[11px] uppercase tracking-wider">Engine Evaluation Verdict:</span>
+            <p id="diag-decision-reason" class="text-slate-300 font-mono leading-relaxed">
+              Evaluating frame...
+            </p>
+          </div>
+
+          <!-- Section 2: Top 3 Candidates & Correlation Scores -->
+          <div class="space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>Top 3 Chord Template Candidates</span>
+              </h4>
+              <span class="text-[11px] text-amber-300/80 font-mono">
+                Scores: Geometric Cosine Similarities [0.0 - 1.0] (Not Calibrated Probabilities)
+              </span>
+            </div>
+
+            <!-- 3 Candidate Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <!-- Candidate 1 (Best) -->
+              <div id="diag-cand-1-card" class="p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/60 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="px-1.5 py-0.5 rounded bg-purple-900 text-purple-200 text-[10px] font-bold">1st Rank (Best)</span>
+                  <span id="diag-cand-1-score" class="font-mono font-bold text-sm text-purple-200">0.000</span>
+                </div>
+                <div class="space-y-0.5">
+                  <div id="diag-cand-1-name" class="text-base font-bold text-white">--</div>
+                  <div id="diag-cand-1-details" class="text-[11px] text-purple-300">Root: -- • Quality: --</div>
+                </div>
+              </div>
+
+              <!-- Candidate 2 -->
+              <div id="diag-cand-2-card" class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">2nd Rank</span>
+                  <span id="diag-cand-2-score" class="font-mono font-bold text-sm text-slate-300">0.000</span>
+                </div>
+                <div class="space-y-0.5">
+                  <div id="diag-cand-2-name" class="text-base font-bold text-slate-200">--</div>
+                  <div id="diag-cand-2-details" class="text-[11px] text-slate-400">Root: -- • Quality: --</div>
+                </div>
+              </div>
+
+              <!-- Candidate 3 -->
+              <div id="diag-cand-3-card" class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">3rd Rank</span>
+                  <span id="diag-cand-3-score" class="font-mono font-bold text-sm text-slate-300">0.000</span>
+                </div>
+                <div class="space-y-0.5">
+                  <div id="diag-cand-3-name" class="text-base font-bold text-slate-200">--</div>
+                  <div id="diag-cand-3-details" class="text-[11px] text-slate-400">Root: -- • Quality: --</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mathematical Metrics Comparison (Score Delta, Triad Completeness, Non-Chord Ratio) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+              <!-- Score Delta -->
+              <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800 space-y-1">
+                <span class="block text-slate-400 text-[11px] font-medium">Score Delta (1st - 2nd)</span>
+                <span id="diag-score-delta" class="font-mono font-bold text-sm text-white">+0.0000</span>
+                <p id="diag-score-delta-label" class="text-[10px] text-slate-400">Confidence margin between top two templates</p>
+              </div>
+
+              <!-- Triad Completeness -->
+              <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-400 text-[11px] font-medium">Triad Completeness</span>
+                  <span class="text-[10px] font-mono text-slate-400">Min/Max ≥ 0.08</span>
+                </div>
+                <span id="diag-triad-completeness" class="font-mono font-bold text-sm text-white">0.0000</span>
+                <p id="diag-triad-notes-breakdown" class="text-[10px] text-slate-400 font-mono">
+                  R: 0.00 | 3rd: 0.00 | 5th: 0.00
+                </p>
+              </div>
+
+              <!-- Non-Chord Energy Ratio -->
+              <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-400 text-[11px] font-medium">Non-Chord Ratio</span>
+                  <span class="text-[10px] font-mono text-slate-400">Noise ≤ 0.65</span>
+                </div>
+                <span id="diag-nonchord-ratio" class="font-mono font-bold text-sm text-white">0.0000</span>
+                <p id="diag-nonchord-status" class="text-[10px] text-slate-400">
+                  Energy outside triad pitch classes
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: 12-Bin Chroma Energy Vector (C through B) -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                12 Chroma Pitch-Class Bins (C through B)
+              </h4>
+              <span class="text-[11px] text-slate-400 font-mono">
+                L2 Normalized [0.00 - 1.00]
+              </span>
+            </div>
+
+            <!-- 12 Chroma Bar Visualizer -->
+            <div id="diag-chroma-bins-container" class="grid grid-cols-6 sm:grid-cols-12 gap-2 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+              <!-- Populated dynamically with 12 vertical bars -->
+            </div>
+          </div>
+
+          <!-- Section 4: Strongest Detected Spectral Peaks -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Strongest Detected Spectral Peaks (FFT Parabolic Interpolation)
+              </h4>
+              <span class="text-[11px] text-slate-400">
+                Frequency resolution: ~5.38 Hz/bin
+              </span>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/40">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-950/80 text-slate-400 border-b border-slate-800 font-mono text-[11px]">
+                  <tr>
+                    <th class="py-2 px-3">#</th>
+                    <th class="py-2 px-3">Frequency</th>
+                    <th class="py-2 px-3">Estimated Note</th>
+                    <th class="py-2 px-3">Pitch Class</th>
+                    <th class="py-2 px-3 text-right">Magnitude</th>
+                  </tr>
+                </thead>
+                <tbody id="diag-peaks-tbody" class="divide-y divide-slate-800/60 font-mono">
+                  <!-- Populated dynamically with peak rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Notice on Calibration -->
+          <div class="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-[11px] text-amber-300/90 leading-relaxed">
+            <span class="font-bold">Developer Notice on Similarity Calibration:</span> Cosine similarity measures geometric alignment between the 12-dimensional chroma vector and an idealized triad model. It is an uncalibrated vector distance, not a Bayesian posterior probability. A score of 0.70 does not mean a 70% probability of correctness.
+          </div>
+        </section>
 
         <!-- 4. Error Retry State (Hidden by default) -->
         <div id="results-error-state" class="hidden space-y-4 py-6 text-center">

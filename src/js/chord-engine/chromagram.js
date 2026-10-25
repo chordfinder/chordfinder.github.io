@@ -5,7 +5,7 @@
  */
 
 import { FFTAnalyzer } from './fft.js';
-import { frequencyToMidi } from './note-pitch.js';
+import { frequencyToMidi, PITCH_CLASSES } from './note-pitch.js';
 
 export const CHROMA_BINS = 12;
 
@@ -45,7 +45,7 @@ export function computeRmsEnergy(frame) {
  * @param {number} sampleRate - e.g. 22050, 44100, 48000
  * @param {FFTAnalyzer} [analyzer] - Optional reusable FFTAnalyzer instance
  * @param {object} [customOptions] - Parameter overrides
- * @returns {{ chroma: Float32Array, rms: number, isSilent: boolean }}
+ * @returns {{ chroma: Float32Array, rms: number, isSilent: boolean, spectralPeaks: Array<{ frequency: number, note: string, pitchClass: string, midi: number, magnitude: number }> }}
  */
 export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null, customOptions = {}) {
   const options = { ...DEFAULT_CHROMA_OPTIONS, ...customOptions };
@@ -56,7 +56,7 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
   const chroma = new Float32Array(CHROMA_BINS);
 
   if (rms < options.silenceThreshold) {
-    return { chroma, rms, isSilent: true };
+    return { chroma, rms, isSilent: true, spectralPeaks: [] };
   }
 
   const magnitudes = fft.analyze(timeDomainFrame);
@@ -82,7 +82,7 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
 
   const globalMax = Math.max(maxMagLow, maxMagMid);
   if (globalMax < 1e-5) {
-    return { chroma, rms, isSilent: true };
+    return { chroma, rms, isSilent: true, spectralPeaks: [] };
   }
 
   const globalFloor = Math.max(1e-4, globalMax * (options.globalFloorRatio || 0.005));
@@ -90,6 +90,7 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
   const midThreshold = Math.max(globalFloor, maxMagMid * options.peakThresholdRatio);
 
   let peaksFound = 0;
+  const detectedPeaks = [];
 
   // Parabolic peak picking across spectrum to eliminate main-lobe leakage
   for (let k = minBin; k <= maxBin; k++) {
@@ -119,6 +120,14 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
         const weight = Math.log1p(beta) * octaveWeight;
         chroma[pitchClass] += weight;
         peaksFound++;
+
+        detectedPeaks.push({
+          frequency: parseFloat(peakFreq.toFixed(1)),
+          note: `${PITCH_CLASSES[pitchClass]}${Math.floor(roundedMidi / 12) - 1}`,
+          pitchClass: PITCH_CLASSES[pitchClass],
+          midi: parseFloat(midiPitch.toFixed(2)),
+          magnitude: parseFloat(beta.toFixed(4))
+        });
       }
     }
   }
@@ -154,7 +163,10 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
     }
   }
 
-  return { chroma, rms, isSilent: false };
+  detectedPeaks.sort((a, b) => b.magnitude - a.magnitude);
+  const spectralPeaks = detectedPeaks.slice(0, 8);
+
+  return { chroma, rms, isSilent: false, spectralPeaks };
 }
 
 /**
@@ -166,7 +178,7 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
  * @param {object} [options]
  * @param {function(number):void} [options.onProgress] - Optional progress callback (0.0 to 1.0)
  * @param {function():boolean} [options.checkCancelled] - Optional cancellation check
- * @returns {Promise<Array<{ time: number, chroma: Float32Array, rms: number, isSilent: boolean }>>}
+ * @returns {Promise<Array<{ time: number, chroma: Float32Array, rms: number, isSilent: boolean, spectralPeaks: Array<{ frequency: number, note: string, pitchClass: string, midi: number, magnitude: number }> }>>}
  */
 export async function extractChromagram(monoAudioData, sampleRate, options = {}) {
   const config = { ...DEFAULT_CHROMA_OPTIONS, ...options };
@@ -178,7 +190,13 @@ export async function extractChromagram(monoAudioData, sampleRate, options = {})
     const singleSlice = new Float32Array(frameSize);
     singleSlice.set(monoAudioData);
     const result = extractFrameChroma(singleSlice, sampleRate, null, config);
-    return [{ time: 0, ...result }];
+    return [{
+      time: 0,
+      chroma: result.chroma,
+      rms: result.rms,
+      isSilent: result.isSilent,
+      spectralPeaks: result.spectralPeaks || []
+    }];
   }
 
   const numFrames = Math.floor((totalSamples - frameSize) / hopSize) + 1;
@@ -202,7 +220,8 @@ export async function extractChromagram(monoAudioData, sampleRate, options = {})
       time,
       chroma: frameResult.chroma,
       rms: frameResult.rms,
-      isSilent: frameResult.isSilent
+      isSilent: frameResult.isSilent,
+      spectralPeaks: frameResult.spectralPeaks || []
     });
 
     if (f % BATCH_SIZE === 0 || f === numFrames - 1) {

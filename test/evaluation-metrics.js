@@ -95,6 +95,7 @@ export function computeChordMetrics(referenceSegments, detectedSegments, options
   let correctSilenceTime = 0;
   let detectedSilenceTime = 0;
   let falseRejectionTime = 0; // Ground truth chord incorrectly marked as N.C.
+  let falseChordDetectionTime = 0; // Ground truth silence incorrectly detected as chord
 
   for (let i = 0; i < steps; i++) {
     const t = i * timeStep;
@@ -113,6 +114,8 @@ export function computeChordMetrics(referenceSegments, detectedSegments, options
       refSilenceTime += timeStep;
       if (det.chord === 'N.C.') {
         correctSilenceTime += timeStep;
+      } else {
+        falseChordDetectionTime += timeStep;
       }
     } else {
       if (det.chord === 'N.C.') {
@@ -198,6 +201,7 @@ export function computeChordMetrics(referenceSegments, detectedSegments, options
   const silenceRejectionRecallPct = refSilenceTime > 0 ? (correctSilenceTime / refSilenceTime) * 100 : null;
   const activeChordDuration = totalEvaluatedTime - refSilenceTime;
   const falseRejectionPct = activeChordDuration > 0 ? (falseRejectionTime / activeChordDuration) * 100 : 0;
+  const falseChordDetectionPct = refSilenceTime > 0 ? (falseChordDetectionTime / refSilenceTime) * 100 : 0;
 
   return {
     trackTitle,
@@ -209,6 +213,7 @@ export function computeChordMetrics(referenceSegments, detectedSegments, options
     majorMinorAccuracyPct: majorMinorAccuracyPct !== null ? parseFloat(majorMinorAccuracyPct.toFixed(2)) : null,
     silenceRejectionRecallPct: silenceRejectionRecallPct !== null ? parseFloat(silenceRejectionRecallPct.toFixed(2)) : null,
     falseRejectionPct: parseFloat(falseRejectionPct.toFixed(2)),
+    falseChordDetectionPct: parseFloat(falseChordDetectionPct.toFixed(2)),
     ncPercentage: parseFloat(ncPercentage.toFixed(2)),
     transitionMetrics: {
       totalReferenceTransitions: refBoundaries.length,
@@ -238,6 +243,7 @@ export function formatMetricsMarkdown(metrics) {
 - **Major-vs-Minor Classification Accuracy**: ${metrics.majorMinorAccuracyPct !== null ? `${metrics.majorMinorAccuracyPct}%` : 'N/A'}
 - **Root-Note Accuracy**: ${metrics.rootAccuracyPct !== null ? `${metrics.rootAccuracyPct}%` : 'N/A'}
 - **Silence & Incomplete Rejection (N.C. Recall)**: ${metrics.silenceRejectionRecallPct !== null ? `${metrics.silenceRejectionRecallPct}%` : 'N/A (no silence in reference)'}
+- **False Chord Detection Rate (Silence/N.C. marked as Chord)**: ${metrics.falseChordDetectionPct}%
 - **False Rejection Rate (Active Chords marked N.C.)**: ${metrics.falseRejectionPct}%
 - **Frames Classified as Uncertain / N.C.**: ${metrics.ncPercentage}%
 - **Chord-Transition Mean Timing Error**: ${metrics.transitionMetrics.meanAbsoluteErrorSec !== null ? `${metrics.transitionMetrics.meanAbsoluteErrorSec}s (max ${metrics.transitionMetrics.maxAbsoluteErrorSec}s across ${metrics.transitionMetrics.matchedTransitionsCount}/${metrics.transitionMetrics.totalReferenceTransitions} transitions)` : 'N/A (no transitions)'}

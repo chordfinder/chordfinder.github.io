@@ -12,7 +12,13 @@ import {
 } from '../audio/audio-manager.js';
 
 import { extractChromagram } from '../chord-engine/chromagram.js';
-import { matchChord, segmentChords } from '../chord-engine/chord-matcher.js';
+import {
+  matchChord,
+  segmentChords,
+  smoothFramePredictions,
+  BASIC_TEMPLATES
+} from '../chord-engine/chord-matcher.js';
+import { PITCH_CLASSES } from '../chord-engine/note-pitch.js';
 
 // DOM Elements: Upload & File Card
 const dropZone = document.getElementById('drop-zone');
@@ -69,6 +75,49 @@ const timelineCurrentTime = document.getElementById('timeline-current-time');
 const analysisErrorText = document.getElementById('analysis-error-text');
 const retryAnalysisBtn = document.getElementById('retry-analysis-btn');
 
+// Diagnostic Panel Elements
+const diagnosticToggleBtn = document.getElementById('diagnostic-toggle-btn');
+const diagnosticToggleStatus = document.getElementById('diagnostic-toggle-status');
+const diagnosticPanel = document.getElementById('diagnostic-panel');
+const diagFollowPlayback = document.getElementById('diag-follow-playback');
+const diagExportJsonBtn = document.getElementById('diag-export-json-btn');
+const diagFrameIndex = document.getElementById('diag-frame-index');
+const diagTotalFrames = document.getElementById('diag-total-frames');
+const diagTimestamp = document.getElementById('diag-timestamp');
+const diagPrevFrameBtn = document.getElementById('diag-prev-frame-btn');
+const diagNextFrameBtn = document.getElementById('diag-next-frame-btn');
+const diagFrameSlider = document.getElementById('diag-frame-slider');
+const diagJumpSmoothedBtn = document.getElementById('diag-jump-smoothed-btn');
+const diagJumpRejectedBtn = document.getElementById('diag-jump-rejected-btn');
+const diagJumpAmbiguousBtn = document.getElementById('diag-jump-ambiguous-btn');
+
+const diagRmsValue = document.getElementById('diag-rms-value');
+const diagSilenceBadge = document.getElementById('diag-silence-badge');
+const diagFinalDecisionBadge = document.getElementById('diag-final-decision-badge');
+const diagChordQuality = document.getElementById('diag-chord-quality');
+const diagSmoothingBadge = document.getElementById('diag-smoothing-badge');
+const diagSmoothingDetails = document.getElementById('diag-smoothing-details');
+const diagDecisionReason = document.getElementById('diag-decision-reason');
+
+const diagCand1Score = document.getElementById('diag-cand-1-score');
+const diagCand1Name = document.getElementById('diag-cand-1-name');
+const diagCand1Details = document.getElementById('diag-cand-1-details');
+const diagCand2Score = document.getElementById('diag-cand-2-score');
+const diagCand2Name = document.getElementById('diag-cand-2-name');
+const diagCand2Details = document.getElementById('diag-cand-2-details');
+const diagCand3Score = document.getElementById('diag-cand-3-score');
+const diagCand3Name = document.getElementById('diag-cand-3-name');
+const diagCand3Details = document.getElementById('diag-cand-3-details');
+
+const diagScoreDelta = document.getElementById('diag-score-delta');
+const diagScoreDeltaLabel = document.getElementById('diag-score-delta-label');
+const diagTriadCompleteness = document.getElementById('diag-triad-completeness');
+const diagTriadNotesBreakdown = document.getElementById('diag-triad-notes-breakdown');
+const diagNonchordRatio = document.getElementById('diag-nonchord-ratio');
+const diagNonchordStatus = document.getElementById('diag-nonchord-status');
+const diagChromaBinsContainer = document.getElementById('diag-chroma-bins-container');
+const diagPeaksTbody = document.getElementById('diag-peaks-tbody');
+
 // State
 let currentFile = null;
 let currentObjectUrl = null;
@@ -78,11 +127,18 @@ let analysisCancelled = false;
 let currentSegments = [];
 let activeSegmentIndex = -1;
 
+// Diagnostic State
+let isDiagnosticMode = false;
+let currentFrameDiagnostics = [];
+let selectedDiagFrameIndex = 0;
+let followPlayback = true;
+
 /**
  * Initializes UI event listeners.
  */
 function init() {
   setupEventListeners();
+  initDiagnosticMode();
   if (chordAnalysisSection) {
     chordAnalysisSection.classList.add('hidden');
   }
@@ -178,6 +234,69 @@ function setupEventListeners() {
   // Audio Player Timeupdate for synchronized timeline highlight
   if (audioPlayer) {
     audioPlayer.addEventListener('timeupdate', handleAudioTimeUpdate);
+  }
+
+  // Diagnostic Mode Toggle Button
+  if (diagnosticToggleBtn) {
+    diagnosticToggleBtn.addEventListener('click', () => {
+      toggleDiagnosticMode();
+    });
+  }
+
+  // Diagnostic Frame Scrubber Slider
+  if (diagFrameSlider) {
+    diagFrameSlider.addEventListener('input', (e) => {
+      const idx = parseInt(e.target.value, 10);
+      renderDiagnosticFrame(idx);
+    });
+  }
+
+  // Diagnostic Frame Step Buttons
+  if (diagPrevFrameBtn) {
+    diagPrevFrameBtn.addEventListener('click', () => {
+      if (selectedDiagFrameIndex > 0) {
+        renderDiagnosticFrame(selectedDiagFrameIndex - 1);
+      }
+    });
+  }
+
+  if (diagNextFrameBtn) {
+    diagNextFrameBtn.addEventListener('click', () => {
+      if (selectedDiagFrameIndex < currentFrameDiagnostics.length - 1) {
+        renderDiagnosticFrame(selectedDiagFrameIndex + 1);
+      }
+    });
+  }
+
+  // Diagnostic Quick Jump Problem Buttons
+  if (diagJumpSmoothedBtn) {
+    diagJumpSmoothedBtn.addEventListener('click', () => {
+      jumpToNextProblemFrame(f => f.wasSmoothed);
+    });
+  }
+
+  if (diagJumpRejectedBtn) {
+    diagJumpRejectedBtn.addEventListener('click', () => {
+      jumpToNextProblemFrame(f => f.chord === 'N.C.' || f.diagnostics?.decision === 'rejected');
+    });
+  }
+
+  if (diagJumpAmbiguousBtn) {
+    diagJumpAmbiguousBtn.addEventListener('click', () => {
+      jumpToNextProblemFrame(f => !f.isSilent && f.diagnostics?.scoreDelta < 0.10);
+    });
+  }
+
+  // Diagnostic Follow Playback Checkbox
+  if (diagFollowPlayback) {
+    diagFollowPlayback.addEventListener('change', (e) => {
+      followPlayback = Boolean(e.target.checked);
+    });
+  }
+
+  // Diagnostic Export Frame JSON Button
+  if (diagExportJsonBtn) {
+    diagExportJsonBtn.addEventListener('click', handleExportFrameJson);
   }
 }
 
@@ -303,6 +422,12 @@ function resetFileSelection() {
   analysisCancelled = false;
   currentSegments = [];
   activeSegmentIndex = -1;
+  currentFrameDiagnostics = [];
+  selectedDiagFrameIndex = 0;
+
+  if (diagnosticPanel) {
+    diagnosticPanel.classList.add('hidden');
+  }
 
   if (fileInput) fileInput.value = '';
   if (audioPlayer) {
@@ -412,8 +537,8 @@ async function handleAnalyzeAudio() {
       progressStatusLabel.textContent = 'Matching 24 Major & Minor chord templates...';
     }
 
-    // Match chord for each frame
-    const framePredictions = chromaFrames.map(f => {
+    // Match chord for each frame with full diagnostic traces
+    const rawFramePredictions = chromaFrames.map(f => {
       const match = matchChord(f.chroma);
       return {
         time: f.time,
@@ -422,17 +547,40 @@ async function handleAnalyzeAudio() {
         root: match.root,
         quality: match.quality,
         score: match.score,
-        isSilent: f.isSilent
+        isSilent: f.isSilent,
+        rms: f.rms,
+        chroma: f.chroma,
+        spectralPeaks: f.spectralPeaks || [],
+        diagnostics: match.diagnostics
       };
     });
 
     // Segment frames and smooth transients
-    const segments = segmentChords(framePredictions, hopDuration, {
+    const smoothedFrames = smoothFramePredictions(rawFramePredictions, 2);
+    currentFrameDiagnostics = smoothedFrames;
+
+    const segments = segmentChords(rawFramePredictions, hopDuration, {
       minSegmentDuration: 0.35
     });
 
     currentSegments = segments;
     renderResults(segments);
+
+    // Update diagnostic controls
+    if (diagFrameSlider) {
+      diagFrameSlider.max = Math.max(0, currentFrameDiagnostics.length - 1);
+      diagFrameSlider.value = 0;
+    }
+    if (diagTotalFrames) {
+      diagTotalFrames.textContent = currentFrameDiagnostics.length;
+    }
+    if (isDiagnosticMode && currentFrameDiagnostics.length > 0) {
+      if (diagnosticPanel) diagnosticPanel.classList.remove('hidden');
+      renderDiagnosticFrame(0);
+    } else if (diagnosticPanel) {
+      diagnosticPanel.classList.add('hidden');
+    }
+
     updateStatusBadge('Complete', 'bg-emerald-900/60 text-emerald-300');
     announceStatus(`Analysis complete! Identified ${segments.length} chord segments across the recording.`);
 
@@ -536,6 +684,9 @@ function renderResults(segments) {
 
       block.addEventListener('click', () => {
         seekAudioTo(seg.startTime);
+        if (isDiagnosticMode) {
+          jumpDiagnosticToTime(seg.startTime + seg.duration / 2, false);
+        }
       });
 
       timelineBar.appendChild(block);
@@ -602,6 +753,9 @@ function renderResults(segments) {
 
       card.addEventListener('click', () => {
         seekAudioTo(seg.startTime);
+        if (isDiagnosticMode) {
+          jumpDiagnosticToTime(seg.startTime + seg.duration / 2, false);
+        }
       });
 
       chordSegmentsList.appendChild(card);
@@ -631,6 +785,11 @@ function handleAudioTimeUpdate() {
 
   if (timelineCurrentTime) {
     timelineCurrentTime.textContent = formatTime(currentTime);
+  }
+
+  // Diagnostic live follow playback
+  if (followPlayback && isDiagnosticMode && currentFrameDiagnostics.length > 0) {
+    jumpDiagnosticToTime(currentTime, false);
   }
 
   // Find active segment
@@ -811,6 +970,354 @@ function announceStatus(message) {
   if (statusArea) {
     statusArea.textContent = message;
   }
+}
+
+/**
+ * Initializes Diagnostic Mode from localStorage or URL parameter.
+ */
+function initDiagnosticMode() {
+  try {
+    const saved = localStorage.getItem('chordfinder_diagnostic_mode');
+    const urlParam = new URLSearchParams(window.location.search).get('diagnostic');
+    if (urlParam === '1' || urlParam === 'true' || saved === 'true') {
+      toggleDiagnosticMode(true);
+    }
+  } catch (e) {
+    // Ignore localStorage or URL parsing errors
+  }
+
+  // Expose global console interface for browser diagnostics and automated testing
+  window.ChordFinderDiagnostics = {
+    isEnabled: () => isDiagnosticMode,
+    toggle: (enable) => toggleDiagnosticMode(enable),
+    getFrames: () => currentFrameDiagnostics,
+    getSegments: () => currentSegments,
+    inspectFrame: (index) => renderDiagnosticFrame(index, true),
+    inspectAtTime: (timeSec) => jumpDiagnosticToTime(timeSec, true),
+    exportCurrentFrame: () => handleExportFrameJson()
+  };
+}
+
+/**
+ * Toggles Diagnostic Mode ON or OFF without modifying standard prediction results.
+ * @param {boolean} [forceState]
+ */
+function toggleDiagnosticMode(forceState) {
+  isDiagnosticMode = typeof forceState === 'boolean' ? forceState : !isDiagnosticMode;
+  try {
+    localStorage.setItem('chordfinder_diagnostic_mode', isDiagnosticMode ? 'true' : 'false');
+  } catch (e) {}
+
+  if (diagnosticToggleBtn) {
+    diagnosticToggleBtn.setAttribute('aria-pressed', isDiagnosticMode ? 'true' : 'false');
+    if (isDiagnosticMode) {
+      diagnosticToggleBtn.classList.add('border-purple-500', 'bg-purple-950/50', 'text-purple-200');
+      diagnosticToggleBtn.classList.remove('border-slate-700/70', 'bg-slate-900', 'text-slate-300');
+    } else {
+      diagnosticToggleBtn.classList.remove('border-purple-500', 'bg-purple-950/50', 'text-purple-200');
+      diagnosticToggleBtn.classList.add('border-slate-700/70', 'bg-slate-900', 'text-slate-300');
+    }
+  }
+
+  if (diagnosticToggleStatus) {
+    diagnosticToggleStatus.textContent = isDiagnosticMode ? 'ON' : 'OFF';
+    diagnosticToggleStatus.className = `px-1.5 py-0.2 rounded text-[10px] font-mono ${
+      isDiagnosticMode ? 'bg-purple-900 text-purple-200 font-bold' : 'bg-slate-800 text-slate-400'
+    }`;
+  }
+
+  if (diagnosticPanel) {
+    if (isDiagnosticMode && currentFrameDiagnostics.length > 0) {
+      diagnosticPanel.classList.remove('hidden');
+      renderDiagnosticFrame(selectedDiagFrameIndex);
+    } else {
+      diagnosticPanel.classList.add('hidden');
+    }
+  }
+
+  announceStatus(`Diagnostic mode ${isDiagnosticMode ? 'enabled' : 'disabled'}.`);
+}
+
+/**
+ * Finds and inspects the analysis frame closest to a given timestamp.
+ * @param {number} targetTime
+ * @param {boolean} [syncAudio=false]
+ */
+function jumpDiagnosticToTime(targetTime, syncAudio = false) {
+  if (!currentFrameDiagnostics || currentFrameDiagnostics.length === 0) return;
+  let closestIdx = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < currentFrameDiagnostics.length; i++) {
+    const diff = Math.abs(currentFrameDiagnostics[i].time - targetTime);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestIdx = i;
+    }
+  }
+  renderDiagnosticFrame(closestIdx, syncAudio);
+}
+
+/**
+ * Searches circularly through frames to locate the next problem frame matching a predicate.
+ * @param {function(object):boolean} predicate
+ */
+function jumpToNextProblemFrame(predicate) {
+  if (!currentFrameDiagnostics || currentFrameDiagnostics.length === 0) return;
+  const n = currentFrameDiagnostics.length;
+  const start = (selectedDiagFrameIndex + 1) % n;
+
+  for (let step = 0; step < n; step++) {
+    const idx = (start + step) % n;
+    const f = currentFrameDiagnostics[idx];
+    if (predicate(f)) {
+      renderDiagnosticFrame(idx, true);
+      return;
+    }
+  }
+  announceStatus('No matching problem frames found in recording.');
+}
+
+/**
+ * Renders full frame-level spectral decomposition and chord correlation diagnostics.
+ * @param {number} frameIndex
+ * @param {boolean} [syncAudio=false]
+ */
+function renderDiagnosticFrame(frameIndex, syncAudio = false) {
+  if (!currentFrameDiagnostics || currentFrameDiagnostics.length === 0) return;
+  const clampedIdx = Math.max(0, Math.min(currentFrameDiagnostics.length - 1, frameIndex));
+  selectedDiagFrameIndex = clampedIdx;
+
+  const frame = currentFrameDiagnostics[clampedIdx];
+  if (!frame) return;
+
+  if (syncAudio && audioPlayer) {
+    seekAudioTo(frame.time);
+  }
+
+  // Header indices
+  if (diagFrameIndex) diagFrameIndex.textContent = `#${clampedIdx}`;
+  if (diagTotalFrames) diagTotalFrames.textContent = currentFrameDiagnostics.length;
+  if (diagTimestamp) diagTimestamp.textContent = `${frame.time.toFixed(2)}s (${formatTime(frame.time)})`;
+  if (diagFrameSlider && parseInt(diagFrameSlider.value, 10) !== clampedIdx) {
+    diagFrameSlider.value = clampedIdx;
+  }
+
+  // RMS Energy
+  if (diagRmsValue) diagRmsValue.textContent = (frame.rms || 0).toFixed(4);
+  if (diagSilenceBadge) {
+    if (frame.isSilent) {
+      diagSilenceBadge.textContent = 'Silence / Low Energy';
+      diagSilenceBadge.className = 'inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800/40';
+    } else {
+      diagSilenceBadge.textContent = 'Active Sound';
+      diagSilenceBadge.className = 'inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800/40';
+    }
+  }
+
+  // Final Decision Badge
+  if (diagFinalDecisionBadge) {
+    if (frame.chord === 'N.C.') {
+      diagFinalDecisionBadge.textContent = 'Rejected: N.C.';
+      diagFinalDecisionBadge.className = 'px-2 py-0.5 rounded text-xs font-bold font-mono bg-red-950 text-red-300 border border-red-800/50 truncate max-w-full';
+    } else {
+      diagFinalDecisionBadge.textContent = `Accepted: ${frame.chord}`;
+      diagFinalDecisionBadge.className = 'px-2 py-0.5 rounded text-xs font-bold font-mono bg-emerald-950 text-emerald-300 border border-emerald-800/50 truncate max-w-full';
+    }
+  }
+
+  if (diagChordQuality) {
+    diagChordQuality.textContent = frame.chord === 'N.C.'
+      ? `Quality: uncertain • Root: none`
+      : `Quality: ${frame.quality || 'none'} • Root: ${frame.root || 'none'}`;
+  }
+
+  // Temporal Smoothing Trace
+  if (diagSmoothingBadge) {
+    if (frame.wasSmoothed) {
+      diagSmoothingBadge.innerHTML = `<span class="text-amber-400 font-bold">Modified by smoothing</span>: Raw <span class="font-mono text-purple-300">${frame.rawChord || 'N.C.'}</span> &rarr; Smoothed <span class="font-mono text-emerald-300">${frame.chord}</span>`;
+    } else {
+      diagSmoothingBadge.innerHTML = `<span class="text-slate-300 font-medium">Unchanged by smoothing</span>: Raw <span class="font-mono text-purple-300">${frame.rawChord || frame.chord}</span>`;
+    }
+  }
+
+  if (diagSmoothingDetails) {
+    if (frame.wasSmoothed) {
+      diagSmoothingDetails.textContent = `Temporal majority vote over ±2 neighboring frames (~460ms) overrode the instantaneous frame prediction.`;
+    } else {
+      diagSmoothingDetails.textContent = `Instantaneous raw frame prediction agreed with the temporal majority vote.`;
+    }
+  }
+
+  // Evaluation Decision Reason
+  if (diagDecisionReason) {
+    diagDecisionReason.textContent = frame.diagnostics?.reason || (frame.isSilent ? 'RMS energy below silence threshold (0.005)' : 'No reason recorded.');
+  }
+
+  // Top 3 Candidates
+  const candidates = frame.diagnostics?.candidates || [];
+  const cand1 = candidates[0];
+  const cand2 = candidates[1];
+  const cand3 = candidates[2];
+
+  if (diagCand1Name) diagCand1Name.textContent = cand1?.chord || '--';
+  if (diagCand1Score) diagCand1Score.textContent = cand1 ? cand1.score.toFixed(3) : '0.000';
+  if (diagCand1Details) diagCand1Details.textContent = cand1 ? `Root: ${cand1.root} • Quality: ${cand1.quality}` : 'Root: -- • Quality: --';
+
+  if (diagCand2Name) diagCand2Name.textContent = cand2?.chord || '--';
+  if (diagCand2Score) diagCand2Score.textContent = cand2 ? cand2.score.toFixed(3) : '0.000';
+  if (diagCand2Details) diagCand2Details.textContent = cand2 ? `Root: ${cand2.root} • Quality: ${cand2.quality}` : 'Root: -- • Quality: --';
+
+  if (diagCand3Name) diagCand3Name.textContent = cand3?.chord || '--';
+  if (diagCand3Score) diagCand3Score.textContent = cand3 ? cand3.score.toFixed(3) : '0.000';
+  if (diagCand3Details) diagCand3Details.textContent = cand3 ? `Root: ${cand3.root} • Quality: ${cand3.quality}` : 'Root: -- • Quality: --';
+
+  // Score Delta
+  const scoreDelta = frame.diagnostics?.scoreDelta ?? (cand1 && cand2 ? Math.max(0, cand1.score - cand2.score) : 0);
+  if (diagScoreDelta) {
+    diagScoreDelta.textContent = `+${scoreDelta.toFixed(3)}`;
+    diagScoreDelta.className = `font-mono font-bold text-sm ${
+      scoreDelta >= 0.15 ? 'text-emerald-400' : scoreDelta < 0.08 ? 'text-amber-400' : 'text-purple-300'
+    }`;
+  }
+  if (diagScoreDeltaLabel) {
+    diagScoreDeltaLabel.textContent = scoreDelta >= 0.15
+      ? 'High separation margin (clear template winner)'
+      : scoreDelta < 0.08
+      ? 'Low separation margin (ambiguous / competing templates)'
+      : 'Moderate separation margin';
+  }
+
+  // Triad Completeness
+  const tc = frame.diagnostics?.triadCompleteness ?? 0;
+  if (diagTriadCompleteness) {
+    diagTriadCompleteness.textContent = tc.toFixed(3);
+    diagTriadCompleteness.className = `font-mono font-bold text-sm ${tc >= 0.08 ? 'text-emerald-400' : 'text-red-400'}`;
+  }
+  if (diagTriadNotesBreakdown) {
+    const tn = frame.diagnostics?.triadNotes;
+    if (tn) {
+      diagTriadNotesBreakdown.textContent = `R(${tn.root}): ${tn.rootEnergy.toFixed(2)} | 3(${tn.third}): ${tn.thirdEnergy.toFixed(2)} | 5(${tn.fifth}): ${tn.fifthEnergy.toFixed(2)}`;
+    } else {
+      diagTriadNotesBreakdown.textContent = 'R: 0.00 | 3rd: 0.00 | 5th: 0.00';
+    }
+  }
+
+  // Non-Chord Energy Ratio
+  const ncr = frame.diagnostics?.nonChordRatio ?? 0;
+  if (diagNonchordRatio) {
+    diagNonchordRatio.textContent = ncr.toFixed(3);
+    diagNonchordRatio.className = `font-mono font-bold text-sm ${ncr <= 0.65 ? 'text-emerald-400' : 'text-red-400'}`;
+  }
+  if (diagNonchordStatus) {
+    diagNonchordStatus.textContent = ncr <= 0.65 ? 'Clean harmonic spectrum (<= 0.65)' : 'High noise or polychord energy (> 0.65)';
+  }
+
+  // 12 Chroma Bins
+  if (diagChromaBinsContainer && frame.chroma) {
+    const tmpl = cand1 ? BASIC_TEMPLATES.find(t => t.name === cand1.chord) : null;
+    diagChromaBinsContainer.innerHTML = '';
+
+    for (let i = 0; i < 12; i++) {
+      const pc = PITCH_CLASSES[i];
+      const val = frame.chroma[i] || 0;
+      const heightPct = Math.min(100, Math.max(4, Math.round(val * 100)));
+
+      let roleTag = '';
+      let barBg = 'bg-slate-700';
+      let textColor = 'text-slate-400';
+
+      if (tmpl) {
+        if (i === tmpl.rootIndex) {
+          roleTag = 'Root';
+          barBg = 'bg-purple-500';
+          textColor = 'text-purple-300 font-bold';
+        } else if (i === tmpl.thirdIndex) {
+          roleTag = '3rd';
+          barBg = 'bg-indigo-500';
+          textColor = 'text-indigo-300 font-bold';
+        } else if (i === tmpl.fifthIndex) {
+          roleTag = '5th';
+          barBg = 'bg-sky-500';
+          textColor = 'text-sky-300 font-bold';
+        }
+      }
+
+      const col = document.createElement('div');
+      col.className = 'flex flex-col items-center justify-end text-center space-y-1';
+      col.innerHTML = `
+        <span class="text-[9px] font-mono text-slate-400">${val.toFixed(2)}</span>
+        <div class="w-full h-16 bg-slate-950 rounded flex items-end justify-center p-0.5 border border-slate-800">
+          <div class="w-full rounded-sm ${barBg} transition-all duration-75" style="height: ${heightPct}%"></div>
+        </div>
+        <span class="text-[11px] font-mono font-semibold ${textColor}">${pc}</span>
+        <span class="text-[9px] font-mono uppercase text-slate-400 h-3">${roleTag}</span>
+      `;
+      diagChromaBinsContainer.appendChild(col);
+    }
+  }
+
+  // Strongest Spectral Peaks Table
+  if (diagPeaksTbody) {
+    const peaks = frame.spectralPeaks || [];
+    if (peaks.length === 0) {
+      diagPeaksTbody.innerHTML = '<tr><td colspan="5" class="py-3 px-3 text-center text-slate-400 text-xs">No prominent spectral peaks found in this frame.</td></tr>';
+    } else {
+      diagPeaksTbody.innerHTML = peaks.map((p, idx) => `
+        <tr class="hover:bg-slate-900/60 transition-colors">
+          <td class="py-1.5 px-3 text-slate-400 font-mono">#${idx + 1}</td>
+          <td class="py-1.5 px-3 font-mono text-purple-300 font-bold">${p.frequency.toFixed(1)} Hz</td>
+          <td class="py-1.5 px-3 font-semibold text-white">${p.note}</td>
+          <td class="py-1.5 px-3 text-slate-300">${p.pitchClass}</td>
+          <td class="py-1.5 px-3 text-right font-mono text-emerald-400">${p.magnitude.toFixed(4)}</td>
+        </tr>
+      `).join('');
+    }
+  }
+}
+
+/**
+ * Exports current frame diagnostic metadata to formatted JSON.
+ */
+function handleExportFrameJson() {
+  if (!currentFrameDiagnostics || currentFrameDiagnostics.length === 0) {
+    showAlert('No analysis data available to export.');
+    return;
+  }
+  const frame = currentFrameDiagnostics[selectedDiagFrameIndex];
+  if (!frame) return;
+
+  const exportData = {
+    app: 'ChordFinder',
+    version: 'Phase 2.4 Diagnostic Trace',
+    frameIndex: selectedDiagFrameIndex,
+    timestampSeconds: parseFloat(frame.time.toFixed(4)),
+    formattedTime: formatTime(frame.time),
+    rmsEnergy: parseFloat(frame.rms.toFixed(5)),
+    isSilent: frame.isSilent,
+    detectedChord: frame.chord,
+    shortName: frame.shortName,
+    root: frame.root,
+    quality: frame.quality,
+    score: parseFloat(frame.score.toFixed(4)),
+    wasSmoothed: Boolean(frame.wasSmoothed),
+    rawChord: frame.rawChord || frame.chord,
+    diagnostics: frame.diagnostics,
+    chromaBins: Array.from(frame.chroma || []).map((val, idx) => ({
+      pitchClass: PITCH_CLASSES[idx],
+      value: parseFloat(val.toFixed(4))
+    })),
+    spectralPeaks: frame.spectralPeaks || []
+  };
+
+  const jsonStr = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chordfinder-frame-${selectedDiagFrameIndex}-${frame.time.toFixed(2)}s.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  announceStatus(`Exported diagnostics for frame #${selectedDiagFrameIndex}.`);
 }
 
 // Auto-run on DOM ready

@@ -23,7 +23,7 @@ import path from 'node:path';
 import { parseWavBuffer } from './wav-utils.js';
 import { extractChromagram } from '../src/js/chord-engine/chromagram.js';
 import { matchChord, segmentChords } from '../src/js/chord-engine/chord-matcher.js';
-import { computeChordMetrics, formatMetricsMarkdown } from './evaluation-metrics.js';
+import { computeChordMetrics, formatMetricsMarkdown, sampleSegmentAtTime } from './evaluation-metrics.js';
 
 export const EVALUATION_CATEGORIES = {
   1: { id: 'clean_acoustic_guitar', name: 'Clean acoustic guitar' },
@@ -34,9 +34,61 @@ export const EVALUATION_CATEGORIES = {
 };
 
 /**
+ * Diagnoses differences between reference ground-truth annotations and detected chord predictions.
+ * Identifies root cause categories (low confidence, incomplete triad, high non-chord noise, etc.)
+ */
+export function diagnoseMismatches(referenceSegments, detectedSegments, framePredictions) {
+  const issues = [];
+  const timeStep = 0.05;
+  const maxTime = Math.max(
+    ...referenceSegments.map(s => s.endTime),
+    ...detectedSegments.map(s => s.endTime)
+  );
+
+  let currentMismatch = null;
+
+  for (let t = 0; t < maxTime; t += timeStep) {
+    const ref = sampleSegmentAtTime(referenceSegments, t);
+    const det = sampleSegmentAtTime(detectedSegments, t);
+
+    if (ref.chord !== det.chord) {
+      if (!currentMismatch) {
+        currentMismatch = {
+          startTime: parseFloat(t.toFixed(2)),
+          endTime: parseFloat((t + timeStep).toFixed(2)),
+          refChord: ref.chord,
+          detChord: det.chord
+        };
+      } else {
+        currentMismatch.endTime = parseFloat((t + timeStep).toFixed(2));
+      }
+    } else {
+      if (currentMismatch) {
+        currentMismatch.duration = parseFloat((currentMismatch.endTime - currentMismatch.startTime).toFixed(2));
+        const midTime = (currentMismatch.startTime + currentMismatch.endTime) / 2;
+        const frame = framePredictions.find(f => Math.abs(f.time - midTime) < 0.15) || framePredictions[0];
+        currentMismatch.frame = frame;
+        issues.push(currentMismatch);
+        currentMismatch = null;
+      }
+    }
+  }
+
+  if (currentMismatch) {
+    currentMismatch.duration = parseFloat((currentMismatch.endTime - currentMismatch.startTime).toFixed(2));
+    const midTime = (currentMismatch.startTime + currentMismatch.endTime) / 2;
+    const frame = framePredictions.find(f => Math.abs(f.time - midTime) < 0.15) || framePredictions[0];
+    currentMismatch.frame = frame;
+    issues.push(currentMismatch);
+  }
+
+  return issues;
+}
+
+/**
  * Runs evaluation on a single audio file and its matching ground-truth JSON annotation.
  */
-export async function evaluateAudioFile(audioFilePath, annotationPath) {
+export async function evaluateAudioFile(audioFilePath, annotationPath, options = {}) {
   const annotationRaw = fs.readFileSync(annotationPath, 'utf-8');
   const annotation = JSON.parse(annotationRaw);
 
@@ -61,7 +113,9 @@ export async function evaluateAudioFile(audioFilePath, annotationPath) {
       root: f.isSilent ? null : match.root,
       quality: f.isSilent ? 'none' : match.quality,
       score: f.isSilent ? 0 : match.score,
-      isSilent: f.isSilent
+      isSilent: f.isSilent,
+      diagnostics: match.diagnostics,
+      spectralPeaks: f.spectralPeaks || []
     };
   });
 
@@ -77,7 +131,9 @@ export async function evaluateAudioFile(audioFilePath, annotationPath) {
     trackTitle: annotation.fileName || path.basename(audioFilePath)
   });
 
-  return { metrics, detectedSegments, referenceSegments: annotation.segments };
+  const mismatches = diagnoseMismatches(annotation.segments, detectedSegments, framePredictions);
+
+  return { metrics, detectedSegments, referenceSegments: annotation.segments, mismatches, framePredictions };
 }
 
 /**
@@ -103,8 +159,20 @@ export async function runEvaluationSuite() {
       const annot = JSON.parse(fs.readFileSync(annotPath, 'utf-8'));
       const wavPath = path.join(fixturesDir, annot.fileName);
       if (fs.existsSync(wavPath)) {
-        const { metrics } = await evaluateAudioFile(wavPath, annotPath);
+        const { metrics, mismatches } = await evaluateAudioFile(wavPath, annotPath);
         console.log(formatMetricsMarkdown(metrics));
+        if (mismatches && mismatches.length > 0 && process.argv.includes('--diagnose')) {
+          console.log('\n--- Diagnostic Mismatch Analysis ---');
+          for (const m of mismatches.slice(0, 5)) {
+            console.log(`[${m.startTime}s - ${m.endTime}s] Expected: "${m.refChord}" | Detected: "${m.detChord}" (${m.duration}s)`);
+            if (m.frame?.diagnostics) {
+              const diag = m.frame.diagnostics;
+              console.log(`  Reason: ${diag.reason}`);
+              console.log(`  Top Candidates: ${diag.candidates?.map(c => `${c.chord} (score: ${c.score})`).join(', ')}`);
+              console.log(`  Triad Completeness: ${diag.triadCompleteness} | Non-Chord Ratio: ${diag.nonChordRatio}`);
+            }
+          }
+        }
         console.log('\n---------------------------------------------------------------\n');
       }
     }
@@ -133,7 +201,8 @@ export async function runEvaluationSuite() {
     console.log('       { "startTime": 0.0, "endTime": 2.5, "chord": "C Major", "root": "C", "quality": "major" }');
     console.log('     ]');
     console.log('   }');
-    console.log('3. Run `node test/run-evaluation.js` to execute automated scoring.\n');
+    console.log('3. Run `node test/run-evaluation.js` to execute automated scoring.');
+    console.log('   Pass `--diagnose` to print detailed per-frame diagnostic failure causes.\n');
     console.log('Categories required for full evaluation:');
     for (const [num, cat] of Object.entries(EVALUATION_CATEGORIES)) {
       console.log(`   ${num}. ${cat.name} (${cat.id})`);
@@ -145,8 +214,20 @@ export async function runEvaluationSuite() {
       const annot = JSON.parse(fs.readFileSync(annotPath, 'utf-8'));
       const wavPath = path.join(recordingsDir, annot.fileName);
       if (fs.existsSync(wavPath)) {
-        const { metrics } = await evaluateAudioFile(wavPath, annotPath);
+        const { metrics, mismatches } = await evaluateAudioFile(wavPath, annotPath);
         console.log(formatMetricsMarkdown(metrics));
+        if (mismatches && mismatches.length > 0) {
+          console.log('\n--- Diagnostic Mismatch Analysis ---');
+          for (const m of mismatches) {
+            console.log(`[${m.startTime}s - ${m.endTime}s] Expected: "${m.refChord}" | Detected: "${m.detChord}" (${m.duration}s)`);
+            if (m.frame?.diagnostics) {
+              const diag = m.frame.diagnostics;
+              console.log(`  Reason: ${diag.reason}`);
+              console.log(`  Top Candidates: ${diag.candidates?.map(c => `${c.chord} (score: ${c.score})`).join(', ')}`);
+              console.log(`  Triad Completeness: ${diag.triadCompleteness} | Non-Chord Ratio: ${diag.nonChordRatio}`);
+            }
+          }
+        }
         console.log('\n---------------------------------------------------------------\n');
       } else {
         console.warn(`Warning: Annotation file ${jsonFile} specified ${annot.fileName}, but audio file was not found.`);

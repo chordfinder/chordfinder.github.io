@@ -129,7 +129,16 @@ export function matchChord(chromaVector, customOptions = {}) {
       quality: 'none',
       score: 0.0,
       isConfident: false,
-      reason: 'No chroma input'
+      reason: 'No chroma input',
+      diagnostics: {
+        candidates: [],
+        scoreDelta: 0,
+        triadCompleteness: 0,
+        triadNotes: null,
+        nonChordRatio: 0,
+        decision: 'rejected',
+        reason: 'No chroma input'
+      }
     };
   }
 
@@ -146,23 +155,43 @@ export function matchChord(chromaVector, customOptions = {}) {
       quality: 'none',
       score: 0.0,
       isConfident: false,
-      reason: 'Zero energy / silence'
+      reason: 'Zero energy / silence',
+      diagnostics: {
+        candidates: [],
+        scoreDelta: 0,
+        triadCompleteness: 0,
+        triadNotes: null,
+        nonChordRatio: 0,
+        decision: 'rejected',
+        reason: 'Zero energy / silence'
+      }
     };
   }
 
-  let bestTemplate = null;
-  let bestScore = -1;
-
+  // Compute cosine similarity against all 24 templates
+  const ranked = [];
   for (let i = 0; i < BASIC_TEMPLATES.length; i++) {
     const tmpl = BASIC_TEMPLATES[i];
     const score = cosineSimilarity(chromaVector, tmpl.vector);
-    if (score > bestScore) {
-      bestScore = score;
-      bestTemplate = tmpl;
-    }
+    ranked.push({ tmpl, score });
   }
+  ranked.sort((a, b) => b.score - a.score);
+
+  const bestTemplate = ranked[0]?.tmpl || null;
+  const bestScore = ranked[0]?.score || 0;
+  const secondScore = ranked[1]?.score || 0;
+  const scoreDelta = parseFloat(Math.max(0, bestScore - secondScore).toFixed(4));
+
+  const topCandidates = ranked.slice(0, 3).map(r => ({
+    chord: r.tmpl.name,
+    shortName: r.tmpl.shortName,
+    root: r.tmpl.root,
+    quality: r.tmpl.quality,
+    score: parseFloat(r.score.toFixed(4))
+  }));
 
   if (bestScore < options.confidenceThreshold || !bestTemplate) {
+    const reason = `Low template match score (${bestScore.toFixed(3)} < ${options.confidenceThreshold} threshold)`;
     return {
       chord: 'N.C.',
       shortName: 'N.C.',
@@ -170,7 +199,16 @@ export function matchChord(chromaVector, customOptions = {}) {
       quality: 'uncertain',
       score: Math.max(0, bestScore),
       isConfident: false,
-      reason: 'Low template match score'
+      reason,
+      diagnostics: {
+        candidates: topCandidates,
+        scoreDelta,
+        triadCompleteness: 0,
+        triadNotes: null,
+        nonChordRatio: 1.0,
+        decision: 'rejected',
+        reason
+      }
     };
   }
 
@@ -181,9 +219,19 @@ export function matchChord(chromaVector, customOptions = {}) {
 
   const minTriadEnergy = Math.min(eRoot, eThird, eFifth);
   const maxTriadEnergy = Math.max(eRoot, eThird, eFifth);
-  const triadCompleteness = minTriadEnergy / Math.max(1e-6, maxTriadEnergy);
+  const triadCompleteness = maxTriadEnergy > 1e-6 ? (minTriadEnergy / maxTriadEnergy) : 0;
+
+  const triadNotes = {
+    root: PITCH_CLASSES[bestTemplate.rootIndex],
+    third: PITCH_CLASSES[bestTemplate.thirdIndex],
+    fifth: PITCH_CLASSES[bestTemplate.fifthIndex],
+    rootEnergy: parseFloat(eRoot.toFixed(4)),
+    thirdEnergy: parseFloat(eThird.toFixed(4)),
+    fifthEnergy: parseFloat(eFifth.toFixed(4))
+  };
 
   if (triadCompleteness < options.minTriadCompleteness) {
+    const reason = `Incomplete triad (${triadCompleteness.toFixed(3)} < ${options.minTriadCompleteness} threshold; missing chord notes / single note or dyad)`;
     return {
       chord: 'N.C.',
       shortName: 'N.C.',
@@ -191,7 +239,16 @@ export function matchChord(chromaVector, customOptions = {}) {
       quality: 'incomplete',
       score: bestScore,
       isConfident: false,
-      reason: 'Incomplete triad (missing chord notes / single note or dyad)'
+      reason,
+      diagnostics: {
+        candidates: topCandidates,
+        scoreDelta,
+        triadCompleteness: parseFloat(triadCompleteness.toFixed(4)),
+        triadNotes,
+        nonChordRatio: 0,
+        decision: 'rejected',
+        reason
+      }
     };
   }
 
@@ -203,8 +260,11 @@ export function matchChord(chromaVector, customOptions = {}) {
       nonChordEnergySum += chromaVector[i];
     }
   }
-  const nonChordRatio = nonChordEnergySum / Math.max(1e-6, chordEnergySum + nonChordEnergySum);
+  const totalEnergy = chordEnergySum + nonChordEnergySum;
+  const nonChordRatio = totalEnergy > 1e-6 ? (nonChordEnergySum / totalEnergy) : 0;
+
   if (nonChordRatio > options.maxNonChordRatio) {
+    const reason = `High non-chord energy ratio (${nonChordRatio.toFixed(3)} > ${options.maxNonChordRatio} threshold; ambiguous mixture or high background noise)`;
     return {
       chord: 'N.C.',
       shortName: 'N.C.',
@@ -212,23 +272,43 @@ export function matchChord(chromaVector, customOptions = {}) {
       quality: 'ambiguous',
       score: bestScore,
       isConfident: false,
-      reason: 'Ambiguous mixture or high background noise'
+      reason,
+      diagnostics: {
+        candidates: topCandidates,
+        scoreDelta,
+        triadCompleteness: parseFloat(triadCompleteness.toFixed(4)),
+        triadNotes,
+        nonChordRatio: parseFloat(nonChordRatio.toFixed(4)),
+        decision: 'rejected',
+        reason
+      }
     };
   }
 
+  const acceptReason = `Accepted: High template correlation (${bestScore.toFixed(3)}), complete triad (${triadCompleteness.toFixed(3)}), low non-chord energy (${nonChordRatio.toFixed(3)})`;
   return {
     chord: bestTemplate.name,
     shortName: bestTemplate.shortName,
     root: bestTemplate.root,
     quality: bestTemplate.quality,
     score: bestScore,
-    isConfident: true
+    isConfident: true,
+    reason: acceptReason,
+    diagnostics: {
+      candidates: topCandidates,
+      scoreDelta,
+      triadCompleteness: parseFloat(triadCompleteness.toFixed(4)),
+      triadNotes,
+      nonChordRatio: parseFloat(nonChordRatio.toFixed(4)),
+      decision: 'accepted',
+      reason: acceptReason
+    }
   };
 }
 
 /**
  * Smooths an array of frame predictions using a temporal majority vote window.
- * Reduces rapid, single-frame flickers.
+ * Reduces rapid, single-frame flickers while recording whether smoothing changed each frame.
  *
  * @param {Array<{ time: number, chord: string, score: number, ... }>} framePredictions
  * @param {number} radius - Number of neighboring frames on each side
@@ -236,7 +316,15 @@ export function matchChord(chromaVector, customOptions = {}) {
  */
 export function smoothFramePredictions(framePredictions, radius = 2) {
   const n = framePredictions.length;
-  if (n <= 2 || radius <= 0) return framePredictions.slice();
+  if (n <= 2 || radius <= 0) {
+    return framePredictions.map(p => ({
+      ...p,
+      wasSmoothed: false,
+      rawChord: p.rawChord || p.chord,
+      rawShortName: p.rawShortName || p.shortName,
+      smoothedChord: p.chord
+    }));
+  }
 
   const smoothed = [];
 
@@ -263,12 +351,26 @@ export function smoothFramePredictions(framePredictions, radius = 2) {
     }
 
     const original = framePredictions[i];
-    if (dominantChord === original.chord) {
-      smoothed.push(original);
+    const wasSmoothed = dominantChord !== original.chord;
+    const rawChord = original.rawChord || original.chord;
+    const rawShortName = original.rawShortName || original.shortName;
+
+    if (!wasSmoothed) {
+      smoothed.push({
+        ...original,
+        wasSmoothed: false,
+        rawChord,
+        rawShortName,
+        smoothedChord: dominantChord
+      });
     } else {
       const tmpl = BASIC_TEMPLATES.find(t => t.name === dominantChord);
       smoothed.push({
         ...original,
+        wasSmoothed: true,
+        rawChord,
+        rawShortName,
+        smoothedChord: dominantChord,
         chord: dominantChord,
         shortName: tmpl ? tmpl.shortName : 'N.C.',
         root: tmpl ? tmpl.root : null,
