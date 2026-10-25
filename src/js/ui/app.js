@@ -407,7 +407,7 @@ async function handleAnalyzeAudio() {
 
     // Segment frames and smooth transients
     const segments = segmentChords(framePredictions, hopDuration, {
-      minSegmentDuration: 0.45
+      minSegmentDuration: 0.35
     });
 
     currentSegments = segments;

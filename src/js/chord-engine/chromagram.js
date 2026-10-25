@@ -12,10 +12,12 @@ export const CHROMA_BINS = 12;
 export const DEFAULT_CHROMA_OPTIONS = {
   frameSize: 8192,
   hopSize: 4096,
-  minFrequency: 55.0,    // A1 (~55 Hz)
+  minFrequency: 50.0,    // G#1/A1 boundary (~50 Hz) to safely capture A1 (55 Hz) without boundary truncation
   maxFrequency: 2100.0,  // C7 (~2093 Hz)
   silenceThreshold: 0.005,
   peakThresholdRatio: 0.04, // Local peak must be >= 4% of spectral max peak
+  splitFrequency: 260.0,    // Split frequency between bass register and mid/treble accompaniment
+  globalFloorRatio: 0.005,  // Absolute noise floor relative to overall spectrum max (prevent noise pick in quiet band)
   octaveCenterMidi: 60,     // C4 (Middle C)
   octaveSpread: 24          // Semitone standard deviation for octave weighting
 };
@@ -63,25 +65,37 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
 
   const minBin = Math.max(2, Math.floor(options.minFrequency / freqResolution));
   const maxBin = Math.min(halfSize - 3, Math.ceil(options.maxFrequency / freqResolution));
+  const splitBin = Math.min(maxBin, Math.max(minBin, Math.round(options.splitFrequency / freqResolution)));
 
-  // Find spectral peak maximum for adaptive thresholding
-  let maxMag = 0;
-  for (let k = minBin; k <= maxBin; k++) {
-    if (magnitudes[k] > maxMag) {
-      maxMag = magnitudes[k];
-    }
+  // Adaptive Multi-Band Peak Thresholding:
+  // Compute separate peak maximums for low (bass) and mid/treble bands so loud bass
+  // fundamentals do not suppress quieter chord accompaniment tones.
+  let maxMagLow = 0;
+  for (let k = minBin; k < splitBin; k++) {
+    if (magnitudes[k] > maxMagLow) maxMagLow = magnitudes[k];
   }
 
-  if (maxMag < 1e-5) {
+  let maxMagMid = 0;
+  for (let k = splitBin; k <= maxBin; k++) {
+    if (magnitudes[k] > maxMagMid) maxMagMid = magnitudes[k];
+  }
+
+  const globalMax = Math.max(maxMagLow, maxMagMid);
+  if (globalMax < 1e-5) {
     return { chroma, rms, isSilent: true };
   }
 
-  const peakThreshold = Math.max(1e-4, maxMag * options.peakThresholdRatio);
+  const globalFloor = Math.max(1e-4, globalMax * (options.globalFloorRatio || 0.005));
+  const lowThreshold = Math.max(globalFloor, maxMagLow * options.peakThresholdRatio);
+  const midThreshold = Math.max(globalFloor, maxMagMid * options.peakThresholdRatio);
+
   let peaksFound = 0;
 
   // Parabolic peak picking across spectrum to eliminate main-lobe leakage
   for (let k = minBin; k <= maxBin; k++) {
     const mag = magnitudes[k];
+    const peakThreshold = k < splitBin ? lowThreshold : midThreshold;
+
     if (mag > peakThreshold && mag > magnitudes[k - 1] && mag > magnitudes[k + 1]) {
       const alpha = magnitudes[k - 1];
       const beta = mag;

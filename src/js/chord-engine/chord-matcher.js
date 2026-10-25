@@ -103,7 +103,7 @@ export function cosineSimilarity(v1, v2) {
 export const DEFAULT_MATCHER_OPTIONS = {
   confidenceThreshold: 0.55,    // Minimum similarity score for a confident chord
   silenceRmsThreshold: 0.005,
-  minSegmentDuration: 0.45,      // Minimum duration in seconds to avoid flicker
+  minSegmentDuration: 0.35,      // Minimum duration in seconds to avoid flicker while supporting fast tempo chord changes
   smoothingRadius: 2,            // Frames on either side for local majority vote
   minTriadCompleteness: 0.08,    // Minimum energy ratio (min note / max note) to prevent single notes or dyads from matching as full triads
   maxNonChordRatio: 0.65         // Maximum allowed ratio of non-chord energy to chord energy
