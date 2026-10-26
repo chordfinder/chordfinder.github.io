@@ -3,18 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="ChordFinder is a fast, browser-based audio chord detection and music visualization tool powered by the Web Audio API.">
-  <meta name="theme-color" content="#0a0f1d">
+  <title>Free Online Chord Finder – Detect Chords from Audio | ChordFinder</title>
+  <meta name="description" content="Upload an audio file to estimate major and minor chords in your browser. Explore chord progressions with a free tool designed to keep your audio on your device.">
+  <link rel="canonical" href="https://chordfinder.github.io/">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#080d1a">
   
-  <!-- Open Graph / Meta -->
-  <meta property="og:title" content="ChordFinder — Browser-Based Audio Chord Detection">
-  <meta property="og:description" content="Detect musical chords directly in your browser using the Web Audio API and chromagram analysis.">
+  <!-- Open Graph / Social Meta -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://chordfinder.github.io/">
+  <meta property="og:title" content="Free Online Chord Finder – Detect Chords from Audio | ChordFinder">
+  <meta property="og:description" content="Upload an audio file to estimate major and minor chords in your browser. Explore chord progressions with a free tool designed to keep your audio on your device.">
+
+  <!-- Twitter Meta -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Free Online Chord Finder – Detect Chords from Audio | ChordFinder">
+  <meta name="twitter:description" content="Upload an audio file to estimate major and minor chords in your browser. Explore chord progressions with a free tool designed to keep your audio on your device.">
 
   <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a855f7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18V5l12-2v13'></path><circle cx='6' cy='18' r='3'></circle><circle cx='18' cy='16' r='3'></circle></svg>">
-
-  <title>ChordFinder — Browser-Based Audio Chord Detection</title>
   
   <!-- Compiled Tailwind CSS v4 -->
   <link rel="stylesheet" href="./assets/css/style.css">
@@ -30,29 +37,31 @@
   <header class="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/20 ring-1 ring-white/20">
-          <!-- Musical note chord logo SVG -->
-          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18V5l12-2v13"></path>
-            <circle cx="6" cy="18" r="3"></circle>
-            <circle cx="18" cy="16" r="3"></circle>
-          </svg>
-        </div>
-        <div>
+        <a href="https://chordfinder.github.io/" class="flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded-lg" aria-label="ChordFinder Homepage">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/20 ring-1 ring-white/20">
+            <!-- Musical note chord logo SVG -->
+            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
           <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-purple-300 bg-clip-text text-transparent">
             ChordFinder
           </span>
-          <span class="hidden sm:inline-block ml-2 px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase rounded-full bg-purple-900/50 text-purple-300 border border-purple-700/50">
-            Phase 2 &bull; Active Engine
-          </span>
-        </div>
+        </a>
       </div>
 
       <nav class="flex items-center gap-3 text-xs sm:text-sm text-slate-400">
+        <a href="#how-it-works" class="hover:text-slate-200 transition-colors hidden md:inline-block">How It Works</a>
+        <a href="#supported-chords" class="hover:text-slate-200 transition-colors hidden md:inline-block">Supported Chords</a>
+        <a href="#faq" class="hover:text-slate-200 transition-colors hidden md:inline-block">FAQ</a>
+
+        <!-- Diagnostic toggle (Hidden by default; gated behind ?diagnostic=true) -->
         <button
           type="button"
           id="diagnostic-toggle-btn"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-700/70 text-slate-300 hover:text-white transition-colors cursor-pointer text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+          class="hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-700/70 text-slate-300 hover:text-white transition-colors cursor-pointer text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
           title="Toggle Diagnostic Engine Mode"
           aria-pressed="false"
         >
@@ -80,10 +89,10 @@
     <!-- Hero Introduction -->
     <section class="text-center max-w-2xl mx-auto space-y-3">
       <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-        Extract chords directly from your audio.
+        Free Online Chord Finder
       </h1>
       <p class="text-base text-slate-400 leading-relaxed">
-        Upload an audio track to extract 12-bin chromagram vectors and analyze musical chords from uploaded recordings using client-side digital signal processing. 100% private in browser memory.
+        Upload an audio file to estimate major and minor chords in your browser. Explore chord progressions with a free tool designed to keep your audio on your device.
       </p>
     </section>
 
@@ -104,7 +113,7 @@
       </div>
     </div>
 
-    <!-- Phase 2 Informational Banner (Hidden by default) -->
+    <!-- Informational Status Banner (Hidden by default) -->
     <div id="phase-notice" class="hidden rounded-xl border border-purple-500/40 bg-purple-950/40 p-4 backdrop-blur-sm text-purple-200 shadow-lg shadow-purple-950/30" role="status">
       <div class="flex items-start gap-3">
         <div class="p-1 rounded-lg bg-purple-800/40 text-purple-300">
@@ -113,7 +122,7 @@
           </svg>
         </div>
         <div class="flex-1 space-y-1">
-          <h2 class="text-sm font-semibold text-purple-100">Analysis Status</h2>
+          <p class="text-sm font-semibold text-purple-100">Analysis Status</p>
           <p id="phase-notice-text" class="text-xs sm:text-sm text-purple-300/90 leading-relaxed"></p>
         </div>
       </div>
@@ -298,7 +307,7 @@
           <!-- Features Overview -->
           <div class="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/40 text-left space-y-3">
             <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Phase 2 Engine Pipeline</span>
+              <span>Audio Analysis Pipeline</span>
               <span class="text-purple-400 font-normal">Active</span>
             </div>
             <ul class="text-xs text-slate-400 space-y-2">
@@ -748,43 +757,400 @@
 
       </section>
 
-      <!-- 3. Technical Foundation & Privacy Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Privacy & Processing Notes -->
-        <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 text-xs text-slate-400 space-y-2.5">
-          <div class="flex items-center gap-2 text-slate-300 font-medium text-sm">
-            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            100% Client-Side Privacy
-          </div>
-          <p class="leading-relaxed">
-            Audio files are processed strictly in your local browser memory using the Web Audio API and custom in-memory DSP algorithms. No audio data leaves your machine.
-          </p>
-        </div>
+      <!-- Educational, Technical & Informational Sections -->
+      <div class="space-y-12 pt-4">
 
-        <!-- Technical Specification Card -->
-        <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-3 text-xs">
-          <h3 class="font-semibold text-slate-300 text-sm">Technical Foundation</h3>
-          <div class="space-y-1.5 text-slate-400">
-            <div class="flex justify-between py-1 border-b border-slate-800/60">
-              <span>Architecture</span>
-              <span class="text-slate-300 font-mono">Vanilla ES Modules</span>
+        <!-- 1. How It Works (Three-Step Guide) -->
+        <section id="how-it-works" class="scroll-mt-20 space-y-6">
+          <div class="text-center sm:text-left space-y-1">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center justify-center sm:justify-start gap-2.5">
+              <span class="p-1.5 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </span>
+              How to Detect Chords from Audio
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Three clear steps to extract chord progressions from any song using in-browser signal processing.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Step 1 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md bg-purple-950 text-purple-300 border border-purple-800/60 font-mono">
+                  Step 01
+                </span>
+                <span class="text-xs text-slate-400">Local Upload</span>
+              </div>
+              <h3 class="text-base font-semibold text-white">Select Audio File</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Drag and drop your audio track or click Browse Files. Supports MP3, WAV, FLAC, OGG, M4A, AAC, and WebM recordings up to 50 MB.
+              </p>
             </div>
-            <div class="flex justify-between py-1 border-b border-slate-800/60">
-              <span>Styling</span>
-              <span class="text-slate-300 font-mono">Tailwind CSS v4 CLI</span>
+
+            <!-- Step 2 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md bg-purple-950 text-purple-300 border border-purple-800/60 font-mono">
+                  Step 02
+                </span>
+                <span class="text-xs text-slate-400">In-Browser DSP</span>
+              </div>
+              <h3 class="text-base font-semibold text-white">Analyze Progression</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Click Analyze Audio. The browser decodes audio frames in local memory, calculates FFT spectra, and generates 12-bin chromagram vectors.
+              </p>
             </div>
-            <div class="flex justify-between py-1 border-b border-slate-800/60">
-              <span>Audio API</span>
-              <span class="text-slate-300 font-mono">Web Audio API</span>
-            </div>
-            <div class="flex justify-between py-1">
-              <span>Deployment</span>
-              <span class="text-slate-300 font-mono">GitHub Pages Static</span>
+
+            <!-- Step 3 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md bg-purple-950 text-purple-300 border border-purple-800/60 font-mono">
+                  Step 03
+                </span>
+                <span class="text-xs text-slate-400">Interactive Timeline</span>
+              </div>
+              <h3 class="text-base font-semibold text-white">Explore &amp; Seek</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Inspect estimated major and minor triads on the progression timeline. Click any chord block to seek the preview player directly to that bar.
+              </p>
             </div>
           </div>
-        </div>
+        </section>
+
+        <!-- 2. Supported Formats & Chord Types -->
+        <section id="supported-chords" class="scroll-mt-20 space-y-6">
+          <div class="text-center sm:text-left space-y-1">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center justify-center sm:justify-start gap-2.5">
+              <span class="p-1.5 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+              </span>
+              Supported Audio Formats &amp; Chord Vocabulary
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Clear technical boundaries and musical coverage implemented by the estimation engine.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Format Specifications -->
+            <div class="p-6 rounded-2xl border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                Audio Format Specifications
+              </h3>
+              <ul class="text-xs text-slate-300 space-y-3">
+                <li class="flex items-start justify-between gap-3 border-b border-slate-800/60 pb-2">
+                  <span class="text-slate-400">File Formats</span>
+                  <span class="font-medium text-slate-200 text-right">MP3, WAV, FLAC, OGG, M4A, AAC, WebM</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 border-b border-slate-800/60 pb-2">
+                  <span class="text-slate-400">Maximum File Size</span>
+                  <span class="font-mono text-purple-300 font-semibold">50 MB per file</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 border-b border-slate-800/60 pb-2">
+                  <span class="text-slate-400">Audio Decoding</span>
+                  <span class="text-slate-200 text-right">Web Audio API (AudioContext)</span>
+                </li>
+                <li class="flex items-start justify-between gap-3 border-b border-slate-800/60 pb-2">
+                  <span class="text-slate-400">Sample Rates</span>
+                  <span class="text-slate-200 text-right">22.05 kHz, 44.1 kHz, 48 kHz (downmixed to mono)</span>
+                </li>
+                <li class="flex items-start justify-between gap-3">
+                  <span class="text-slate-400">Analysis Frame Size</span>
+                  <span class="font-mono text-slate-300">4096 samples (~93 ms with 50% hop)</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Chord Vocabulary -->
+            <div class="p-6 rounded-2xl border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                Chord Vocabulary (24 Basic Triads)
+              </h3>
+              <div class="space-y-3 text-xs text-slate-300">
+                <div>
+                  <span class="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                    12 Major Triads:
+                  </span>
+                  <div class="flex flex-wrap gap-1 font-mono text-[11px]">
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">C</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">C♯</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">D</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">D♯</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">E</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">F</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">F♯</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">G</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">G♯</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">A</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">A♯</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-purple-300">B</span>
+                  </div>
+                </div>
+
+                <div>
+                  <span class="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                    12 Minor Triads:
+                  </span>
+                  <div class="flex flex-wrap gap-1 font-mono text-[11px]">
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Cm</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">C♯m</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Dm</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">D♯m</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Em</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Fm</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">F♯m</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Gm</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">G♯m</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Am</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">A♯m</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-indigo-300">Bm</span>
+                  </div>
+                </div>
+
+                <div class="pt-1 text-[11px] text-slate-400 leading-relaxed border-t border-slate-800/60">
+                  <p>
+                    <strong class="text-slate-300">Unpitched / Silence:</strong> Labeled as <span class="font-mono text-slate-200">N.C.</span> (No Chord) when sound is quiet or lacks clear triad harmony. Complex chords (7ths, 9ths, sus, diminished) are matched to their nearest triad base or omitted.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. How the Detection Process Works -->
+        <section id="detection-process" class="scroll-mt-20 space-y-6">
+          <div class="text-center sm:text-left space-y-1">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center justify-center sm:justify-start gap-2.5">
+              <span class="p-1.5 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </span>
+              How the Browser-Based Detection Works
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              An overview of how digital signal processing converts acoustic audio into musical harmony.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Phase 1 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2.5">
+              <div class="text-[11px] font-mono text-purple-400 font-semibold uppercase tracking-wider">
+                Phase 1 &bull; Signal Windowing
+              </div>
+              <h3 class="text-sm font-semibold text-white">Hann-Windowed Framing</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                The mono audio buffer is split into overlapping 4096-sample windows (~93 ms) with a 2048-sample hop (~46 ms). A Hann window function tapers frame boundaries to suppress spectral edge leakage before Fourier analysis.
+              </p>
+            </div>
+
+            <!-- Phase 2 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2.5">
+              <div class="text-[11px] font-mono text-purple-400 font-semibold uppercase tracking-wider">
+                Phase 2 &bull; Spectral Transformation
+              </div>
+              <h3 class="text-sm font-semibold text-white">Radix-2 Cooley-Tukey FFT</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                A custom radix-2 Fast Fourier Transform decomposes time-domain audio frames into frequency magnitude bins. Parabolic peak interpolation sharpens pitch estimates across musical fundamentals and overtones.
+              </p>
+            </div>
+
+            <!-- Phase 3 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2.5">
+              <div class="text-[11px] font-mono text-purple-400 font-semibold uppercase tracking-wider">
+                Phase 3 &bull; Pitch-Class Folding
+              </div>
+              <h3 class="text-sm font-semibold text-white">12-Bin Chromagram Extraction</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Frequencies spanning 6 musical octaves (A1 ~55 Hz to C7 ~2100 Hz) are folded into the 12 chromatic semitones (C through B). The resulting 12-dimensional chroma vector is L2-normalized to represent pitch energy balance.
+              </p>
+            </div>
+
+            <!-- Phase 4 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2.5">
+              <div class="text-[11px] font-mono text-purple-400 font-semibold uppercase tracking-wider">
+                Phase 4 &bull; Pattern Matching
+              </div>
+              <h3 class="text-sm font-semibold text-white">Cosine Template Matching &amp; Smoothing</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Each chroma vector is compared against normalized major and minor triad profiles using cosine similarity. A temporal smoothing filter eliminates rapid transient flicker before adjacent matching frames merge into timed segments.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Accuracy Limitations -->
+        <section id="accuracy-limitations" class="scroll-mt-20 space-y-6">
+          <div class="text-center sm:text-left space-y-1">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center justify-center sm:justify-start gap-2.5">
+              <span class="p-1.5 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </span>
+              Accuracy Considerations &amp; Limitations
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Understanding acoustic factors that influence automated chord extraction accuracy.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200">Dense Mixes &amp; Multi-Tracking</h3>
+              <p class="text-slate-400 leading-relaxed">
+                Recordings featuring multiple simultaneous instruments, distorted guitars, heavy synths, or thick reverberation produce dense overtone spectra. Overlapping frequencies can mask the underlying triad root and produce brief misidentifications.
+              </p>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200">Heavy Percussion &amp; Drums</h3>
+              <p class="text-slate-400 leading-relaxed">
+                Sharp percussive transients like snare hits and crash cymbals disperse acoustic energy across all pitch classes as broadband noise. The engine filters out short transient clicks, but intense drum passages may temporarily register as unclassified (N.C.).
+              </p>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200">Extended Chords &amp; Inversions</h3>
+              <p class="text-slate-400 leading-relaxed">
+                When songs employ jazz chords (major 7ths, 9ths, diminished, or augmented) or slash chords with non-root bass notes, the algorithm maps them to the nearest matching major or minor triad, or marks them ambiguous if energy is dispersed.
+              </p>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200">Recordings with Highest Accuracy</h3>
+              <p class="text-slate-400 leading-relaxed">
+                ChordFinder performs most reliably on clear, harmonically focused recordings—such as acoustic guitar, clean piano, keyboard stems, or isolated song accompaniment where harmonic instruments are prominent.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Privacy Guarantee -->
+        <section id="privacy-guarantee" class="scroll-mt-20 space-y-6">
+          <div class="text-center sm:text-left space-y-1">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center justify-center sm:justify-start gap-2.5">
+              <span class="p-1.5 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </span>
+              Client-Side Privacy Guarantee
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Your audio files and music data remain strictly on your local device.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                No Server Uploads
+              </h3>
+              <p class="text-slate-400 leading-relaxed">
+                Audio decoding and DSP algorithms run in your browser's local memory via the Web Audio API. Zero audio bytes, filenames, or waveforms are transmitted over the network.
+              </p>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                In-Memory Ephemeral Storage
+              </h3>
+              <p class="text-slate-400 leading-relaxed">
+                Audio buffers exist solely in volatile memory while the application tab is active. Removing the file or refreshing the page clears all audio data immediately.
+              </p>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2 text-xs">
+              <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Zero Telemetry or Tracking
+              </h3>
+              <p class="text-slate-400 leading-relaxed">
+                ChordFinder contains no tracking beacons, third-party analytics scripts, or advertising trackers. No profiling or cookie logging takes place.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. Frequently Asked Questions -->
+        <section id="faq" class="scroll-mt-20 space-y-6">
+          <div class="text-center sm:text-left space-y-1">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center justify-center sm:justify-start gap-2.5">
+              <span class="p-1.5 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </span>
+              Frequently Asked Questions
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Clear answers to common questions about ChordFinder's chord detection and audio capabilities.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- FAQ 1 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+              <h3 class="text-sm font-semibold text-white">Does ChordFinder upload my audio files?</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                No. All decoding and digital signal processing occur entirely in your local browser using the Web Audio API. No audio data ever leaves your computer or mobile device.
+              </p>
+            </div>
+
+            <!-- FAQ 2 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+              <h3 class="text-sm font-semibold text-white">What audio formats can I analyze?</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                ChordFinder supports MP3, WAV, FLAC, OGG, M4A, AAC, and WebM audio files up to 50 MB in size.
+              </p>
+            </div>
+
+            <!-- FAQ 3 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+              <h3 class="text-sm font-semibold text-white">Which chords can the tool identify?</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                The engine detects all 12 major and 12 minor triads (24 templates), as well as unpitched or silent sections (N.C.). Complex chords (such as 7ths or 9ths) are estimated by their underlying triad base.
+              </p>
+            </div>
+
+            <!-- FAQ 4 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+              <h3 class="text-sm font-semibold text-white">What does "N.C." mean in the results?</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                "N.C." stands for No Chord. It indicates segments where the signal was silent, dominated by unpitched percussion, or lacked clear triad harmonic energy above detection thresholds.
+              </p>
+            </div>
+
+            <!-- FAQ 5 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+              <h3 class="text-sm font-semibold text-white">Can I seek audio playback by clicking chords?</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Yes. Clicking any chord card in the progression list or clicking any colored segment in the synchronized timeline seeks the audio player to that exact moment.
+              </p>
+            </div>
+
+            <!-- FAQ 6 -->
+            <div class="p-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 space-y-2">
+              <h3 class="text-sm font-semibold text-white">Is ChordFinder completely free to use?</h3>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Yes. ChordFinder is a free, privacy-first web utility that requires no subscription, account registration, or software download.
+              </p>
+            </div>
+          </div>
+        </section>
+
       </div>
 
     </div>
@@ -792,10 +1158,56 @@
   </main>
 
   <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-slate-950/80 py-6 text-center text-xs text-slate-400">
-    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <p>ChordFinder &copy; 2026 &mdash; Browser-based audio intelligence.</p>
-      <p class="text-slate-400">Zero dependencies &bull; No telemetry &bull; Privacy preserved</p>
+  <footer class="border-t border-slate-800/80 bg-slate-950/90 py-10 text-xs text-slate-400">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <!-- Col 1: Brand -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow">
+              <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+              </svg>
+            </div>
+            <span class="text-base font-bold text-white tracking-tight">ChordFinder</span>
+          </div>
+          <p class="text-slate-400 leading-relaxed">
+            Free browser-based audio chord detection and music visualization. Client-side digital signal processing powered by the Web Audio API.
+          </p>
+        </div>
+
+        <!-- Col 2: Navigation -->
+        <div class="space-y-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Quick Navigation</h3>
+          <ul class="space-y-2">
+            <li><a href="#audio-upload-section" class="hover:text-purple-300 transition-colors">Upload &amp; Analyze</a></li>
+            <li><a href="#how-it-works" class="hover:text-purple-300 transition-colors">How It Works</a></li>
+            <li><a href="#supported-chords" class="hover:text-purple-300 transition-colors">Supported Chords</a></li>
+            <li><a href="#detection-process" class="hover:text-purple-300 transition-colors">Detection Methodology</a></li>
+            <li><a href="#faq" class="hover:text-purple-300 transition-colors">Frequently Asked Questions</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 3: Trust & Foundation -->
+        <div class="space-y-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Trust &amp; Transparency</h3>
+          <ul class="space-y-2">
+            <li><a href="#privacy-guarantee" class="hover:text-purple-300 transition-colors">Client-Side Privacy Guarantee</a></li>
+            <li><a href="#accuracy-limitations" class="hover:text-purple-300 transition-colors">Accuracy Limitations</a></li>
+            <li><span class="text-slate-500">About &bull; Contact &bull; Terms (Dedicated Pages Forthcoming)</span></li>
+          </ul>
+          <p class="text-[11px] text-slate-500 pt-1">
+            Zero network uploads &bull; No cookies &bull; Local memory only
+          </p>
+        </div>
+      </div>
+
+      <div class="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-500 text-[11px]">
+        <p>&copy; 2026 ChordFinder &bull; Open-source audio analysis on GitHub Pages.</p>
+        <p>Vanilla JavaScript &bull; Web Audio API &bull; Tailwind CSS v4</p>
+      </div>
     </div>
   </footer>
 

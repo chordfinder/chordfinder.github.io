@@ -984,23 +984,37 @@ function announceStatus(message) {
 }
 
 /**
- * Initializes Diagnostic Mode from localStorage or URL parameter.
+ * Initializes Diagnostic Mode, gating developer controls behind an explicit URL parameter (?diagnostic=true).
  */
 function initDiagnosticMode() {
+  let isDevParam = false;
   try {
-    const saved = localStorage.getItem('chordfinder_diagnostic_mode');
     const urlParam = new URLSearchParams(window.location.search).get('diagnostic');
-    if (urlParam === '1' || urlParam === 'true' || saved === 'true') {
-      toggleDiagnosticMode(true);
-    }
+    isDevParam = (urlParam === '1' || urlParam === 'true');
   } catch (e) {
-    // Ignore localStorage or URL parsing errors
+    // Ignore URL parsing errors
+  }
+
+  if (diagnosticToggleBtn) {
+    if (isDevParam) {
+      diagnosticToggleBtn.classList.remove('hidden');
+      toggleDiagnosticMode(true);
+    } else {
+      diagnosticToggleBtn.classList.add('hidden');
+      isDiagnosticMode = false;
+      if (diagnosticPanel) {
+        diagnosticPanel.classList.add('hidden');
+      }
+    }
   }
 
   // Expose global console interface for browser diagnostics and automated testing
   window.ChordFinderDiagnostics = {
     isEnabled: () => isDiagnosticMode,
-    toggle: (enable) => toggleDiagnosticMode(enable),
+    toggle: (enable) => {
+      if (diagnosticToggleBtn) diagnosticToggleBtn.classList.remove('hidden');
+      toggleDiagnosticMode(enable);
+    },
     getFrames: () => currentFrameDiagnostics,
     getSegments: () => currentSegments,
     getDiagnosticAtTime: (timeSec) => getFrameDiagnosticsAtTime(timeSec, currentFrameDiagnostics, currentSegments),

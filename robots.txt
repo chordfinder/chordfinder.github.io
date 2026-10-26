@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chordfinder.github.io/sitemap.xml
