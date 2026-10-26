@@ -17,4 +17,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Build & staging artifacts
+_site/
+dist/
+
 # Note: assets/css/style.css is tracked as a production asset for GitHub Pages static hosting.
+
