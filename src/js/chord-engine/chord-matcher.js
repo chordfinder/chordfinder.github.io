@@ -489,3 +489,124 @@ export function segmentChords(frames, hopDuration = 0.093, options = {}) {
     similarityScore: parseFloat(s.similarityScore.toFixed(3))
   }));
 }
+
+/**
+ * Retrieves comprehensive, consistent diagnostic information for a specific timestamp.
+ * Identifies the exact corresponding frame and reports:
+ * - Raw chord prediction and candidate scores
+ * - Raw rejection decision and reason
+ * - Smoothed prediction and whether smoothing changed the prediction
+ * - Final segment label, start/end times, and duration
+ * - Explicit explanation if the frame and its final segment differ
+ *
+ * @param {number} time - Selected timestamp in seconds
+ * @param {Array<object>} framePredictions - Array of frame analysis objects
+ * @param {Array<object>} [segments=[]] - Array of detected chord segments
+ * @param {object} [options={}] - Additional options (e.g. hopDuration)
+ * @returns {object} Consistent diagnostic metadata for the timestamp
+ */
+export function getFrameDiagnosticsAtTime(time, framePredictions, segments = [], options = {}) {
+  if (!framePredictions || framePredictions.length === 0) {
+    return {
+      frameIndex: -1,
+      frameTime: time,
+      timeOffset: 0,
+      rawChord: 'N.C.',
+      rawShortName: 'N.C.',
+      rawCandidates: [],
+      rawScore: 0,
+      rawDecision: 'rejected',
+      rawReason: 'No analysis frames available',
+      scoreDelta: 0,
+      triadCompleteness: 0,
+      triadNotes: null,
+      nonChordRatio: 0,
+      smoothedChord: 'N.C.',
+      smoothedShortName: 'N.C.',
+      wasSmoothed: false,
+      finalSegmentChord: 'N.C.',
+      finalSegmentShortName: 'N.C.',
+      segmentStartTime: null,
+      segmentEndTime: null,
+      segmentDuration: null,
+      segmentScore: null,
+      differExplanation: 'No analysis frames available.',
+      frame: null
+    };
+  }
+
+  // Find closest frame to the requested timestamp
+  let closestIndex = 0;
+  let minDiff = Infinity;
+  for (let i = 0; i < framePredictions.length; i++) {
+    const diff = Math.abs(framePredictions[i].time - time);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestIndex = i;
+    }
+  }
+  const frame = framePredictions[closestIndex];
+
+  // Find the final segment covering the requested timestamp
+  let segment = segments.find(s => time >= s.startTime && time < s.endTime);
+  if (!segment && segments.length > 0) {
+    const lastSeg = segments[segments.length - 1];
+    if (time >= lastSeg.startTime && time <= lastSeg.endTime + 0.05) {
+      segment = lastSeg;
+    }
+  }
+
+  const rawChord = frame.rawChord || frame.chord || 'N.C.';
+  const rawShortName = frame.rawShortName || frame.shortName || 'N.C.';
+  const smoothedChord = frame.smoothedChord || frame.chord || 'N.C.';
+  const smoothedShortName = frame.shortName || 'N.C.';
+  const wasSmoothed = Boolean(frame.wasSmoothed);
+  const finalSegmentChord = segment ? segment.chord : 'N.C.';
+  const finalSegmentShortName = segment ? (segment.shortName || segment.chord) : 'N.C.';
+  const rawDecision = frame.diagnostics?.decision || (frame.isSilent ? 'rejected' : (rawChord === 'N.C.' ? 'rejected' : 'accepted'));
+  const rawReason = frame.diagnostics?.reason || (frame.isSilent ? 'RMS energy below silence threshold (0.005)' : (rawChord === 'N.C.' ? 'Low template match score' : 'Accepted'));
+  const rawCandidates = frame.diagnostics?.candidates || [];
+  const rawScore = rawCandidates[0]?.score ?? (frame.score || 0);
+
+  let differExplanation = '';
+  if (!segment) {
+    const lastEnd = segments.length > 0 ? segments[segments.length - 1].endTime : 0;
+    differExplanation = `Timestamp (${time.toFixed(2)}s) falls outside detected segments (last segment ended at ${lastEnd.toFixed(2)}s). Closest frame #${closestIndex} (${frame.time.toFixed(2)}s) predicted ${smoothedChord}.`;
+  } else if (wasSmoothed && smoothedChord === finalSegmentChord && rawChord !== finalSegmentChord) {
+    differExplanation = `Temporal smoothing modified frame #${closestIndex} from raw ${rawChord} to ${smoothedChord}, which formed segment [${segment.startTime}s - ${segment.endTime}s].`;
+  } else if (smoothedChord !== finalSegmentChord) {
+    differExplanation = `Frame #${closestIndex} (smoothed: ${smoothedChord}) differs from final segment ${finalSegmentChord} [${segment.startTime}s - ${segment.endTime}s] due to minimum duration segment merging.`;
+  } else if (rawChord !== smoothedChord) {
+    differExplanation = `Temporal smoothing modified raw prediction ${rawChord} to ${smoothedChord}.`;
+  } else {
+    differExplanation = `Frame #${closestIndex} (${frame.time.toFixed(2)}s) raw prediction (${rawChord}), smoothed prediction (${smoothedChord}), and final segment (${finalSegmentChord} [${segment.startTime}s - ${segment.endTime}s]) are consistent.`;
+  }
+
+  return {
+    frameIndex: closestIndex,
+    frameTime: parseFloat(frame.time.toFixed(4)),
+    timeOffset: parseFloat((time - frame.time).toFixed(4)),
+    rawChord,
+    rawShortName,
+    rawCandidates,
+    rawScore: parseFloat(rawScore.toFixed(4)),
+    rawDecision,
+    rawReason,
+    scoreDelta: frame.diagnostics?.scoreDelta ?? 0,
+    triadCompleteness: frame.diagnostics?.triadCompleteness ?? 0,
+    triadNotes: frame.diagnostics?.triadNotes ?? null,
+    nonChordRatio: frame.diagnostics?.nonChordRatio ?? 0,
+    smoothedChord,
+    smoothedShortName,
+    wasSmoothed,
+    finalSegmentChord,
+    finalSegmentShortName,
+    segmentStartTime: segment ? segment.startTime : null,
+    segmentEndTime: segment ? segment.endTime : null,
+    segmentDuration: segment ? segment.duration : null,
+    segmentScore: segment ? segment.similarityScore : null,
+    differExplanation,
+    frame
+  };
+}
+

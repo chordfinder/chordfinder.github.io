@@ -22,7 +22,7 @@ import path from 'node:path';
 
 import { parseWavBuffer } from './wav-utils.js';
 import { extractChromagram } from '../src/js/chord-engine/chromagram.js';
-import { matchChord, segmentChords } from '../src/js/chord-engine/chord-matcher.js';
+import { matchChord, segmentChords, getFrameDiagnosticsAtTime } from '../src/js/chord-engine/chord-matcher.js';
 import { computeChordMetrics, formatMetricsMarkdown, sampleSegmentAtTime } from './evaluation-metrics.js';
 
 export const EVALUATION_CATEGORIES = {
@@ -35,7 +35,8 @@ export const EVALUATION_CATEGORIES = {
 
 /**
  * Diagnoses differences between reference ground-truth annotations and detected chord predictions.
- * Identifies root cause categories (low confidence, incomplete triad, high non-chord noise, etc.)
+ * Employs consistent frame and segment references via getFrameDiagnosticsAtTime,
+ * ensuring no measurements from unrelated timestamps are mixed together.
  */
 export function diagnoseMismatches(referenceSegments, detectedSegments, framePredictions) {
   const issues = [];
@@ -66,8 +67,9 @@ export function diagnoseMismatches(referenceSegments, detectedSegments, framePre
       if (currentMismatch) {
         currentMismatch.duration = parseFloat((currentMismatch.endTime - currentMismatch.startTime).toFixed(2));
         const midTime = (currentMismatch.startTime + currentMismatch.endTime) / 2;
-        const frame = framePredictions.find(f => Math.abs(f.time - midTime) < 0.15) || framePredictions[0];
-        currentMismatch.frame = frame;
+        const diag = getFrameDiagnosticsAtTime(midTime, framePredictions, detectedSegments);
+        currentMismatch.diagnostic = diag;
+        currentMismatch.frame = diag.frame;
         issues.push(currentMismatch);
         currentMismatch = null;
       }
@@ -77,8 +79,9 @@ export function diagnoseMismatches(referenceSegments, detectedSegments, framePre
   if (currentMismatch) {
     currentMismatch.duration = parseFloat((currentMismatch.endTime - currentMismatch.startTime).toFixed(2));
     const midTime = (currentMismatch.startTime + currentMismatch.endTime) / 2;
-    const frame = framePredictions.find(f => Math.abs(f.time - midTime) < 0.15) || framePredictions[0];
-    currentMismatch.frame = frame;
+    const diag = getFrameDiagnosticsAtTime(midTime, framePredictions, detectedSegments);
+    currentMismatch.diagnostic = diag;
+    currentMismatch.frame = diag.frame;
     issues.push(currentMismatch);
   }
 
@@ -137,100 +140,119 @@ export async function evaluateAudioFile(audioFilePath, annotationPath, options =
 }
 
 /**
+ * Prints comprehensive and consistent diagnostic details for detected mismatches.
+ */
+function printMismatchDiagnostics(mismatches, limit = 5) {
+  const items = limit ? mismatches.slice(0, limit) : mismatches;
+  console.log('\n--- Diagnostic Mismatch Analysis ---');
+  for (const m of items) {
+    console.log(`[${m.startTime}s - ${m.endTime}s] Expected: "${m.refChord}" | Detected: "${m.detChord}" (${m.duration}s)`);
+    const d = m.diagnostic;
+    if (d) {
+      console.log(`  Corresponding Frame: #${d.frameIndex} @ ${d.frameTime.toFixed(2)}s (offset: ${d.timeOffset >= 0 ? '+' : ''}${d.timeOffset.toFixed(2)}s)`);
+      console.log(`  Raw Prediction: ${d.rawChord} (decision: ${d.rawDecision}) | Smoothed: ${d.smoothedChord} (wasSmoothed: ${d.wasSmoothed})`);
+      console.log(`  Final Segment: ${d.finalSegmentChord}${d.segmentStartTime !== null ? ` [${d.segmentStartTime}s - ${d.segmentEndTime}s]` : ' (none)'}`);
+      console.log(`  Raw Reason: ${d.rawReason}`);
+      if (d.rawCandidates && d.rawCandidates.length > 0) {
+        console.log(`  Top Candidates: ${d.rawCandidates.map(c => `${c.chord} (score: ${c.score.toFixed(4)})`).join(', ')}`);
+      }
+      console.log(`  Triad Completeness: ${d.triadCompleteness} | Non-Chord Ratio: ${d.nonChordRatio}`);
+      if (d.differExplanation) {
+        console.log(`  Consistency Analysis: ${d.differExplanation}`);
+      }
+    } else if (m.frame?.diagnostics) {
+      const diag = m.frame.diagnostics;
+      console.log(`  Reason: ${diag.reason}`);
+      console.log(`  Top Candidates: ${diag.candidates?.map(c => `${c.chord} (score: ${c.score})`).join(', ')}`);
+      console.log(`  Triad Completeness: ${diag.triadCompleteness} | Non-Chord Ratio: ${diag.nonChordRatio}`);
+    }
+  }
+}
+
+/**
  * Main evaluation suite runner.
  */
 export async function runEvaluationSuite() {
+  const runSynthetic = !process.argv.includes('--recordings-only');
+  const runRecordings = !process.argv.includes('--synthetic-only');
+
   console.log('===============================================================');
-  console.log('       CHORDFINDER AUDIO EVALUATION RUNNER (PHASE 2.2)');
+  console.log('       CHORDFINDER AUDIO EVALUATION RUNNER (PHASE 2.6)');
   console.log('===============================================================\n');
 
   // Check 1: Synthetic Benchmarks in test/fixtures/
-  const fixturesDir = path.resolve('test/fixtures');
-  const syntheticFiles = fs.existsSync(fixturesDir)
-    ? fs.readdirSync(fixturesDir).filter(f => f.endsWith('.json') && !f.includes('invalid'))
-    : [];
+  if (runSynthetic) {
+    const fixturesDir = path.resolve('test/fixtures');
+    const syntheticFiles = fs.existsSync(fixturesDir)
+      ? fs.readdirSync(fixturesDir).filter(f => f.endsWith('.json') && !f.includes('invalid'))
+      : [];
 
-  console.log('--- PART 1: SYNTHETIC BENCHMARK EVALUATIONS ---');
-  if (syntheticFiles.length === 0) {
-    console.log('No synthetic benchmarks found in test/fixtures/');
-  } else {
-    for (const jsonFile of syntheticFiles) {
-      const annotPath = path.join(fixturesDir, jsonFile);
-      const annot = JSON.parse(fs.readFileSync(annotPath, 'utf-8'));
-      const wavPath = path.join(fixturesDir, annot.fileName);
-      if (fs.existsSync(wavPath)) {
-        const { metrics, mismatches } = await evaluateAudioFile(wavPath, annotPath);
-        console.log(formatMetricsMarkdown(metrics));
-        if (mismatches && mismatches.length > 0 && process.argv.includes('--diagnose')) {
-          console.log('\n--- Diagnostic Mismatch Analysis ---');
-          for (const m of mismatches.slice(0, 5)) {
-            console.log(`[${m.startTime}s - ${m.endTime}s] Expected: "${m.refChord}" | Detected: "${m.detChord}" (${m.duration}s)`);
-            if (m.frame?.diagnostics) {
-              const diag = m.frame.diagnostics;
-              console.log(`  Reason: ${diag.reason}`);
-              console.log(`  Top Candidates: ${diag.candidates?.map(c => `${c.chord} (score: ${c.score})`).join(', ')}`);
-              console.log(`  Triad Completeness: ${diag.triadCompleteness} | Non-Chord Ratio: ${diag.nonChordRatio}`);
-            }
+    console.log('--- PART 1: SYNTHETIC BENCHMARK EVALUATIONS ---');
+    if (syntheticFiles.length === 0) {
+      console.log('No synthetic benchmarks found in test/fixtures/');
+    } else {
+      for (const jsonFile of syntheticFiles) {
+        const annotPath = path.join(fixturesDir, jsonFile);
+        const annot = JSON.parse(fs.readFileSync(annotPath, 'utf-8'));
+        const wavPath = path.join(fixturesDir, annot.fileName);
+        if (fs.existsSync(wavPath)) {
+          const { metrics, mismatches } = await evaluateAudioFile(wavPath, annotPath);
+          console.log(formatMetricsMarkdown(metrics));
+          if (mismatches && mismatches.length > 0 && process.argv.includes('--diagnose')) {
+            printMismatchDiagnostics(mismatches, 5);
           }
+          console.log('\n---------------------------------------------------------------\n');
         }
-        console.log('\n---------------------------------------------------------------\n');
       }
     }
   }
 
   // Check 2: Real-World Recordings in test/recordings/
-  console.log('--- PART 2: REAL-WORLD RECORDING EVALUATIONS ---');
-  const recordingsDir = path.resolve('test/recordings');
+  if (runRecordings) {
+    console.log('--- PART 2: REAL-WORLD RECORDING EVALUATIONS ---');
+    const recordingsDir = path.resolve('test/recordings');
 
-  if (!fs.existsSync(recordingsDir)) {
-    fs.mkdirSync(recordingsDir, { recursive: true });
-  }
-
-  const realJsonFiles = fs.readdirSync(recordingsDir).filter(f => f.endsWith('.json'));
-
-  if (realJsonFiles.length === 0) {
-    console.log('STATUS: No local real musical recordings found in test/recordings/.');
-    console.log('REAL-WORLD ACCURACY REMAINS UNMEASURED.\n');
-    console.log('Evaluation Procedure for Real Recordings:');
-    console.log('1. Place uncompressed PCM .wav recordings into `test/recordings/`.');
-    console.log('2. Provide a matching `<filename>.json` with ground truth reference segments:');
-    console.log('   {');
-    console.log('     "fileName": "my_guitar_track.wav",');
-    console.log('     "category": "clean_acoustic_guitar", // options: clean_acoustic_guitar, clean_piano, multi_instrument, silence_transitions, inversions_voicings');
-    console.log('     "segments": [');
-    console.log('       { "startTime": 0.0, "endTime": 2.5, "chord": "C Major", "root": "C", "quality": "major" }');
-    console.log('     ]');
-    console.log('   }');
-    console.log('3. Run `node test/run-evaluation.js` to execute automated scoring.');
-    console.log('   Pass `--diagnose` to print detailed per-frame diagnostic failure causes.\n');
-    console.log('Categories required for full evaluation:');
-    for (const [num, cat] of Object.entries(EVALUATION_CATEGORIES)) {
-      console.log(`   ${num}. ${cat.name} (${cat.id})`);
+    if (!fs.existsSync(recordingsDir)) {
+      fs.mkdirSync(recordingsDir, { recursive: true });
     }
-    console.log('\nReal-world measurements are postponed until actual files are supplied.');
-  } else {
-    for (const jsonFile of realJsonFiles) {
-      const annotPath = path.join(recordingsDir, jsonFile);
-      const annot = JSON.parse(fs.readFileSync(annotPath, 'utf-8'));
-      const wavPath = path.join(recordingsDir, annot.fileName);
-      if (fs.existsSync(wavPath)) {
-        const { metrics, mismatches } = await evaluateAudioFile(wavPath, annotPath);
-        console.log(formatMetricsMarkdown(metrics));
-        if (mismatches && mismatches.length > 0) {
-          console.log('\n--- Diagnostic Mismatch Analysis ---');
-          for (const m of mismatches) {
-            console.log(`[${m.startTime}s - ${m.endTime}s] Expected: "${m.refChord}" | Detected: "${m.detChord}" (${m.duration}s)`);
-            if (m.frame?.diagnostics) {
-              const diag = m.frame.diagnostics;
-              console.log(`  Reason: ${diag.reason}`);
-              console.log(`  Top Candidates: ${diag.candidates?.map(c => `${c.chord} (score: ${c.score})`).join(', ')}`);
-              console.log(`  Triad Completeness: ${diag.triadCompleteness} | Non-Chord Ratio: ${diag.nonChordRatio}`);
-            }
+
+    const realJsonFiles = fs.readdirSync(recordingsDir).filter(f => f.endsWith('.json'));
+
+    if (realJsonFiles.length === 0) {
+      console.log('STATUS: No local real musical recordings found in test/recordings/.');
+      console.log('REAL-WORLD ACCURACY REMAINS UNMEASURED.\n');
+      console.log('Evaluation Procedure for Real Recordings:');
+      console.log('1. Place uncompressed PCM .wav recordings into `test/recordings/`.');
+      console.log('2. Provide a matching `<filename>.json` with ground truth reference segments:');
+      console.log('   {');
+      console.log('     "fileName": "my_guitar_track.wav",');
+      console.log('     "category": "clean_acoustic_guitar", // options: clean_acoustic_guitar, clean_piano, multi_instrument, silence_transitions, inversions_voicings');
+      console.log('     "segments": [');
+      console.log('       { "startTime": 0.0, "endTime": 2.5, "chord": "C Major", "root": "C", "quality": "major" }');
+      console.log('     ]');
+      console.log('   }');
+      console.log('3. Run `node test/run-evaluation.js` to execute automated scoring.');
+      console.log('   Pass `--diagnose` to print detailed per-frame diagnostic failure causes.\n');
+      console.log('Categories required for full evaluation:');
+      for (const [num, cat] of Object.entries(EVALUATION_CATEGORIES)) {
+        console.log(`   ${num}. ${cat.name} (${cat.id})`);
+      }
+      console.log('\nReal-world measurements are postponed until actual files are supplied.');
+    } else {
+      for (const jsonFile of realJsonFiles) {
+        const annotPath = path.join(recordingsDir, jsonFile);
+        const annot = JSON.parse(fs.readFileSync(annotPath, 'utf-8'));
+        const wavPath = path.join(recordingsDir, annot.fileName);
+        if (fs.existsSync(wavPath)) {
+          const { metrics, mismatches } = await evaluateAudioFile(wavPath, annotPath);
+          console.log(formatMetricsMarkdown(metrics));
+          if (mismatches && mismatches.length > 0 && process.argv.includes('--diagnose')) {
+            printMismatchDiagnostics(mismatches, 0); // show all mismatches in real recordings
           }
+          console.log('\n---------------------------------------------------------------\n');
+        } else {
+          console.warn(`Warning: Annotation file ${jsonFile} specified ${annot.fileName}, but audio file was not found.`);
         }
-        console.log('\n---------------------------------------------------------------\n');
-      } else {
-        console.warn(`Warning: Annotation file ${jsonFile} specified ${annot.fileName}, but audio file was not found.`);
       }
     }
   }

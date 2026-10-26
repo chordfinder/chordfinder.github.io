@@ -520,7 +520,7 @@
           </div>
 
           <!-- Section 1: Frame Decision & Energy Metrics Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             <!-- RMS Energy -->
             <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1">
               <span class="block text-slate-400 text-[11px] font-medium">RMS Energy</span>
@@ -533,9 +533,9 @@
               </div>
             </div>
 
-            <!-- Final Decision -->
+            <!-- Frame Prediction Decision -->
             <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1">
-              <span class="block text-slate-400 text-[11px] font-medium">Final Decision</span>
+              <span class="block text-slate-400 text-[11px] font-medium">Frame Prediction</span>
               <div class="flex items-center gap-2">
                 <span id="diag-final-decision-badge" class="px-2 py-0.5 rounded text-xs font-bold font-mono bg-purple-950 text-purple-300 border border-purple-800/50 truncate max-w-full">
                   Accepted: C Major
@@ -546,23 +546,42 @@
               </div>
             </div>
 
+            <!-- Final Segment State -->
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1">
+              <span class="block text-slate-400 text-[11px] font-medium">Final Segment Label</span>
+              <div class="flex items-center gap-2">
+                <span id="diag-final-segment-badge" class="px-2 py-0.5 rounded text-xs font-bold font-mono bg-purple-950 text-purple-300 border border-purple-800/50 truncate max-w-full">
+                  Segment: C Major
+                </span>
+              </div>
+              <div id="diag-segment-range" class="text-[11px] text-slate-400 font-mono truncate">
+                0.00s &rarr; 1.50s (1.50s)
+              </div>
+            </div>
+
             <!-- Temporal Smoothing Trace -->
-            <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1 md:col-span-2">
+            <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-1">
               <span class="block text-slate-400 text-[11px] font-medium">Temporal Smoothing State</span>
               <div id="diag-smoothing-badge" class="text-xs font-medium text-slate-200">
                 Unchanged by smoothing (Raw: C Major)
               </div>
-              <p id="diag-smoothing-details" class="text-[11px] text-slate-400 leading-snug">
+              <p id="diag-smoothing-details" class="text-[10px] text-slate-400 leading-snug">
                 Local temporal majority vote across ±2 neighbor frames (~460ms).
               </p>
             </div>
           </div>
 
           <!-- Decision & Rejection Reason Banner -->
-          <div id="diag-reason-banner" class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 text-xs space-y-1">
-            <span class="block font-semibold text-slate-300 text-[11px] uppercase tracking-wider">Engine Evaluation Verdict:</span>
+          <div id="diag-reason-banner" class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 text-xs space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="block font-semibold text-slate-300 text-[11px] uppercase tracking-wider">Engine Evaluation Verdict:</span>
+              <span id="diag-consistency-badge" class="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800/40">Consistent</span>
+            </div>
             <p id="diag-decision-reason" class="text-slate-300 font-mono leading-relaxed">
               Evaluating frame...
+            </p>
+            <p id="diag-consistency-explanation" class="text-slate-400 text-[11px] border-t border-slate-800/60 pt-1 leading-snug">
+              Frame prediction and final segment are consistent.
             </p>
           </div>
 

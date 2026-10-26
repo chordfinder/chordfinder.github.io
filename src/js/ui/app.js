@@ -16,7 +16,8 @@ import {
   matchChord,
   segmentChords,
   smoothFramePredictions,
-  BASIC_TEMPLATES
+  BASIC_TEMPLATES,
+  getFrameDiagnosticsAtTime
 } from '../chord-engine/chord-matcher.js';
 import { PITCH_CLASSES } from '../chord-engine/note-pitch.js';
 
@@ -95,8 +96,12 @@ const diagRmsValue = document.getElementById('diag-rms-value');
 const diagSilenceBadge = document.getElementById('diag-silence-badge');
 const diagFinalDecisionBadge = document.getElementById('diag-final-decision-badge');
 const diagChordQuality = document.getElementById('diag-chord-quality');
+const diagFinalSegmentBadge = document.getElementById('diag-final-segment-badge');
+const diagSegmentRange = document.getElementById('diag-segment-range');
 const diagSmoothingBadge = document.getElementById('diag-smoothing-badge');
 const diagSmoothingDetails = document.getElementById('diag-smoothing-details');
+const diagConsistencyBadge = document.getElementById('diag-consistency-badge');
+const diagConsistencyExplanation = document.getElementById('diag-consistency-explanation');
 const diagDecisionReason = document.getElementById('diag-decision-reason');
 
 const diagCand1Score = document.getElementById('diag-cand-1-score');
@@ -992,6 +997,7 @@ function initDiagnosticMode() {
     toggle: (enable) => toggleDiagnosticMode(enable),
     getFrames: () => currentFrameDiagnostics,
     getSegments: () => currentSegments,
+    getDiagnosticAtTime: (timeSec) => getFrameDiagnosticsAtTime(timeSec, currentFrameDiagnostics, currentSegments),
     inspectFrame: (index) => renderDiagnosticFrame(index, true),
     inspectAtTime: (timeSec) => jumpDiagnosticToTime(timeSec, true),
     exportCurrentFrame: () => handleExportFrameJson()
@@ -1131,26 +1137,60 @@ function renderDiagnosticFrame(frameIndex, syncAudio = false) {
       : `Quality: ${frame.quality || 'none'} • Root: ${frame.root || 'none'}`;
   }
 
+  // Frame & Segment Consistency Diagnostics via getFrameDiagnosticsAtTime
+  const diagInfo = getFrameDiagnosticsAtTime(frame.time, currentFrameDiagnostics, currentSegments);
+
+  // Final Segment Badge & Range
+  if (diagFinalSegmentBadge) {
+    if (diagInfo.finalSegmentChord === 'N.C.') {
+      diagFinalSegmentBadge.textContent = 'Segment: N.C.';
+      diagFinalSegmentBadge.className = 'px-2 py-0.5 rounded text-xs font-bold font-mono bg-slate-900 text-slate-400 border border-slate-800 truncate max-w-full';
+    } else {
+      diagFinalSegmentBadge.textContent = `Segment: ${diagInfo.finalSegmentChord}`;
+      diagFinalSegmentBadge.className = 'px-2 py-0.5 rounded text-xs font-bold font-mono bg-purple-950 text-purple-300 border border-purple-800/50 truncate max-w-full';
+    }
+  }
+
+  if (diagSegmentRange) {
+    if (diagInfo.segmentStartTime !== null) {
+      diagSegmentRange.textContent = `${diagInfo.segmentStartTime.toFixed(2)}s → ${diagInfo.segmentEndTime.toFixed(2)}s (${diagInfo.segmentDuration.toFixed(2)}s)`;
+    } else {
+      diagSegmentRange.textContent = 'Outside detected segments';
+    }
+  }
+
   // Temporal Smoothing Trace
   if (diagSmoothingBadge) {
-    if (frame.wasSmoothed) {
-      diagSmoothingBadge.innerHTML = `<span class="text-amber-400 font-bold">Modified by smoothing</span>: Raw <span class="font-mono text-purple-300">${frame.rawChord || 'N.C.'}</span> &rarr; Smoothed <span class="font-mono text-emerald-300">${frame.chord}</span>`;
+    if (diagInfo.wasSmoothed) {
+      diagSmoothingBadge.innerHTML = `<span class="text-amber-400 font-bold">Modified by smoothing</span>: Raw <span class="font-mono text-purple-300">${diagInfo.rawChord}</span> &rarr; Smoothed <span class="font-mono text-emerald-300">${diagInfo.smoothedChord}</span>`;
     } else {
-      diagSmoothingBadge.innerHTML = `<span class="text-slate-300 font-medium">Unchanged by smoothing</span>: Raw <span class="font-mono text-purple-300">${frame.rawChord || frame.chord}</span>`;
+      diagSmoothingBadge.innerHTML = `<span class="text-slate-300 font-medium">Unchanged by smoothing</span>: Raw <span class="font-mono text-purple-300">${diagInfo.rawChord}</span>`;
     }
   }
 
   if (diagSmoothingDetails) {
-    if (frame.wasSmoothed) {
+    if (diagInfo.wasSmoothed) {
       diagSmoothingDetails.textContent = `Temporal majority vote over ±2 neighboring frames (~460ms) overrode the instantaneous frame prediction.`;
     } else {
       diagSmoothingDetails.textContent = `Instantaneous raw frame prediction agreed with the temporal majority vote.`;
     }
   }
 
-  // Evaluation Decision Reason
+  // Engine Evaluation Verdict & Consistency
+  if (diagConsistencyBadge) {
+    const isConsistent = diagInfo.differExplanation.includes('consistent');
+    diagConsistencyBadge.textContent = isConsistent ? 'Consistent' : 'Frame vs Segment Diff';
+    diagConsistencyBadge.className = isConsistent
+      ? 'px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800/40'
+      : 'px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800/40';
+  }
+
+  if (diagConsistencyExplanation) {
+    diagConsistencyExplanation.textContent = diagInfo.differExplanation;
+  }
+
   if (diagDecisionReason) {
-    diagDecisionReason.textContent = frame.diagnostics?.reason || (frame.isSilent ? 'RMS energy below silence threshold (0.005)' : 'No reason recorded.');
+    diagDecisionReason.textContent = diagInfo.rawReason;
   }
 
   // Top 3 Candidates
@@ -1286,14 +1326,37 @@ function handleExportFrameJson() {
   const frame = currentFrameDiagnostics[selectedDiagFrameIndex];
   if (!frame) return;
 
+  const diagInfo = getFrameDiagnosticsAtTime(frame.time, currentFrameDiagnostics, currentSegments);
+
   const exportData = {
     app: 'ChordFinder',
-    version: 'Phase 2.4 Diagnostic Trace',
+    version: 'Phase 2.6 Diagnostic Consistency',
     frameIndex: selectedDiagFrameIndex,
     timestampSeconds: parseFloat(frame.time.toFixed(4)),
     formattedTime: formatTime(frame.time),
     rmsEnergy: parseFloat(frame.rms.toFixed(5)),
     isSilent: frame.isSilent,
+    rawPrediction: {
+      chord: diagInfo.rawChord,
+      shortName: diagInfo.rawShortName,
+      decision: diagInfo.rawDecision,
+      reason: diagInfo.rawReason,
+      score: diagInfo.rawScore
+    },
+    smoothedPrediction: {
+      chord: diagInfo.smoothedChord,
+      shortName: diagInfo.smoothedShortName,
+      wasSmoothed: diagInfo.wasSmoothed
+    },
+    finalSegment: {
+      chord: diagInfo.finalSegmentChord,
+      shortName: diagInfo.finalSegmentShortName,
+      startTime: diagInfo.segmentStartTime,
+      endTime: diagInfo.segmentEndTime,
+      duration: diagInfo.segmentDuration,
+      similarityScore: diagInfo.segmentScore
+    },
+    consistencyAnalysis: diagInfo.differExplanation,
     detectedChord: frame.chord,
     shortName: frame.shortName,
     root: frame.root,

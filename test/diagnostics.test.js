@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { matchChord, smoothFramePredictions } from '../src/js/chord-engine/chord-matcher.js';
+import { matchChord, smoothFramePredictions, segmentChords, getFrameDiagnosticsAtTime } from '../src/js/chord-engine/chord-matcher.js';
 import { extractFrameChroma } from '../src/js/chord-engine/chromagram.js';
 import { diagnoseMismatches } from './run-evaluation.js';
 
@@ -137,4 +137,169 @@ test('Diagnostics: diagnoseMismatches locates differences between reference and 
   const mismatches = diagnoseMismatches(ref, det, frames);
   assert.ok(mismatches.length > 0);
   assert.ok(mismatches[0].startTime >= 0.85 && mismatches[0].endTime <= 1.05);
+  assert.ok(mismatches[0].diagnostic);
+  assert.equal(mismatches[0].diagnostic.frameIndex, 1);
 });
+
+test('Diagnostics Regression: getFrameDiagnosticsAtTime resolves Case 1 boundary without frame mixing (3.00s-3.05s)', () => {
+  // Construct sequence representing G Major transition to A Minor
+  const frames = [
+    {
+      time: 2.879,
+      chord: 'G Major',
+      rawChord: 'G Major',
+      score: 0.9109,
+      diagnostics: {
+        candidates: [{ chord: 'G Major', score: 0.9109 }],
+        decision: 'accepted',
+        reason: 'Accepted: High template correlation'
+      }
+    },
+    {
+      time: 2.972,
+      chord: 'A Minor',
+      rawChord: 'A Minor',
+      score: 1.0,
+      diagnostics: {
+        candidates: [{ chord: 'A Minor', score: 1.0 }],
+        decision: 'accepted',
+        reason: 'Accepted: High template correlation'
+      }
+    },
+    {
+      time: 3.065,
+      chord: 'A Minor',
+      rawChord: 'A Minor',
+      score: 1.0,
+      diagnostics: {
+        candidates: [{ chord: 'A Minor', score: 1.0 }],
+        decision: 'accepted',
+        reason: 'Accepted: High template correlation'
+      }
+    }
+  ];
+
+  const segments = [
+    { chord: 'G Major', startTime: 1.49, endTime: 2.97, duration: 1.48 },
+    { chord: 'A Minor', startTime: 2.97, endTime: 4.37, duration: 1.40 }
+  ];
+
+  // At midTime 3.025s (range 3.00s - 3.05s)
+  const diag = getFrameDiagnosticsAtTime(3.025, frames, segments);
+
+  // Must select the closest frame (frame 1 at 2.972s or frame 2 at 3.065s), NOT frame 0 (2.879s G Major)
+  assert.ok(diag.frameIndex === 1 || diag.frameIndex === 2, `Expected frame 1 or 2, got ${diag.frameIndex}`);
+  assert.equal(diag.rawChord, 'A Minor');
+  assert.equal(diag.smoothedChord, 'A Minor');
+  assert.equal(diag.finalSegmentChord, 'A Minor');
+  assert.equal(diag.wasSmoothed, false);
+  assert.equal(diag.segmentStartTime, 2.97);
+  assert.equal(diag.segmentEndTime, 4.37);
+  assert.equal(diag.rawCandidates[0].chord, 'A Minor');
+  assert.ok(diag.rawScore > 0.99);
+
+  // Must NOT report G Major with score 0.9109
+  assert.notEqual(diag.rawChord, 'G Major');
+  assert.notEqual(diag.rawCandidates[0].chord, 'G Major');
+});
+
+test('Diagnostics Regression: getFrameDiagnosticsAtTime resolves Case 2 audio tail without falling back to Frame 0 (4.40s-4.55s)', () => {
+  const frames = [
+    {
+      time: 0.0,
+      chord: 'C Major',
+      rawChord: 'C Major',
+      score: 0.9999,
+      diagnostics: {
+        candidates: [{ chord: 'C Major', score: 0.9999 }],
+        decision: 'accepted',
+        reason: 'Accepted: Frame 0'
+      }
+    },
+    {
+      time: 4.272,
+      chord: 'A Minor',
+      rawChord: 'A Minor',
+      score: 1.0,
+      diagnostics: {
+        candidates: [{ chord: 'A Minor', score: 1.0 }],
+        decision: 'accepted',
+        reason: 'Accepted: Frame 46'
+      }
+    }
+  ];
+
+  const segments = [
+    { chord: 'C Major', startTime: 0.0, endTime: 1.5, duration: 1.5 },
+    { chord: 'A Minor', startTime: 3.0, endTime: 4.37, duration: 1.37 }
+  ];
+
+  // At midTime 4.475s (range 4.40s - 4.55s)
+  const diag = getFrameDiagnosticsAtTime(4.475, frames, segments);
+
+  // Must identify the closest frame (frame 1 at 4.272s), NEVER fallback to frame 0 (C Major)
+  assert.equal(diag.frameIndex, 1);
+  assert.equal(diag.frameTime, 4.272);
+  assert.equal(diag.rawChord, 'A Minor');
+  assert.notEqual(diag.rawChord, 'C Major');
+  assert.notEqual(diag.rawCandidates[0].chord, 'C Major');
+
+  // Segment should be N.C. because 4.475s is past 4.37s
+  assert.equal(diag.finalSegmentChord, 'N.C.');
+  assert.equal(diag.segmentStartTime, null);
+
+  // Explanation must explicitly note that timestamp falls outside detected segments
+  assert.ok(diag.differExplanation.includes('outside detected segments'));
+});
+
+test('Diagnostics: getFrameDiagnosticsAtTime explains differences when smoothing or segment merging occurs', () => {
+  // Case A: Smoothing modified raw prediction
+  const smoothedFrames = [
+    {
+      time: 1.0,
+      chord: 'C Major',
+      rawChord: 'D Minor',
+      smoothedChord: 'C Major',
+      wasSmoothed: true,
+      diagnostics: {
+        candidates: [{ chord: 'D Minor', score: 0.65 }],
+        decision: 'accepted',
+        reason: 'Accepted raw Dm'
+      }
+    }
+  ];
+  const segmentsA = [
+    { chord: 'C Major', startTime: 0.5, endTime: 1.5, duration: 1.0 }
+  ];
+  const diagA = getFrameDiagnosticsAtTime(1.0, smoothedFrames, segmentsA);
+  assert.equal(diagA.wasSmoothed, true);
+  assert.equal(diagA.rawChord, 'D Minor');
+  assert.equal(diagA.smoothedChord, 'C Major');
+  assert.equal(diagA.finalSegmentChord, 'C Major');
+  assert.ok(diagA.differExplanation.includes('Temporal smoothing modified'));
+
+  // Case B: Segment merging modified final segment
+  const mergedFrames = [
+    {
+      time: 2.0,
+      chord: 'E Minor',
+      rawChord: 'E Minor',
+      smoothedChord: 'E Minor',
+      wasSmoothed: false,
+      diagnostics: {
+        candidates: [{ chord: 'E Minor', score: 0.85 }],
+        decision: 'accepted',
+        reason: 'Accepted Em'
+      }
+    }
+  ];
+  const segmentsB = [
+    { chord: 'C Major', startTime: 1.5, endTime: 2.5, duration: 1.0 }
+  ];
+  const diagB = getFrameDiagnosticsAtTime(2.0, mergedFrames, segmentsB);
+  assert.equal(diagB.wasSmoothed, false);
+  assert.equal(diagB.rawChord, 'E Minor');
+  assert.equal(diagB.finalSegmentChord, 'C Major');
+  assert.ok(diagB.differExplanation.includes('differs from final segment'));
+});
+
