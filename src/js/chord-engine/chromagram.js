@@ -24,12 +24,15 @@ export const DEFAULT_CHROMA_OPTIONS = {
 
 /**
  * Computes root-mean-square (RMS) energy of an audio frame.
+ * Only actual audio samples are used for energy calculation, ensuring padding
+ * does not dilute or distort the measurement.
  * @param {Float32Array|Array<number>} frame
+ * @param {number} [actualSampleCount] - Optional number of actual audio samples (excluding padding)
  * @returns {number}
  */
-export function computeRmsEnergy(frame) {
+export function computeRmsEnergy(frame, actualSampleCount = null) {
   let sum = 0;
-  const len = frame.length;
+  const len = actualSampleCount !== null ? Math.min(frame.length, actualSampleCount) : frame.length;
   for (let i = 0; i < len; i++) {
     const val = frame[i];
     sum += val * val;
@@ -52,7 +55,8 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
   const frameSize = options.frameSize;
   const fft = analyzer || new FFTAnalyzer(frameSize);
 
-  const rms = computeRmsEnergy(timeDomainFrame);
+  const actualSampleCount = customOptions.actualSampleCount ?? timeDomainFrame.length;
+  const rms = computeRmsEnergy(timeDomainFrame, actualSampleCount);
   const chroma = new Float32Array(CHROMA_BINS);
 
   if (rms < options.silenceThreshold) {
@@ -172,26 +176,39 @@ export function extractFrameChroma(timeDomainFrame, sampleRate, analyzer = null,
 /**
  * Extracts a sequence of chroma frames from a mono Float32Array audio buffer.
  * Supports asynchronous batched processing with progress updates.
+ * Correctly covers the recording tail with a padded analysis frame when audio does
+ * not fit an exact multiple of the FFT frame size.
  *
  * @param {Float32Array} monoAudioData
  * @param {number} sampleRate
  * @param {object} [options]
  * @param {function(number):void} [options.onProgress] - Optional progress callback (0.0 to 1.0)
  * @param {function():boolean} [options.checkCancelled] - Optional cancellation check
- * @returns {Promise<Array<{ time: number, chroma: Float32Array, rms: number, isSilent: boolean, spectralPeaks: Array<{ frequency: number, note: string, pitchClass: string, midi: number, magnitude: number }> }>>}
+ * @returns {Promise<Array<{ time: number, actualEndTime?: number, actualSampleCount?: number, isPadded?: boolean, chroma: Float32Array, rms: number, isSilent: boolean, spectralPeaks: Array<{ frequency: number, note: string, pitchClass: string, midi: number, magnitude: number }> }>>}
  */
 export async function extractChromagram(monoAudioData, sampleRate, options = {}) {
   const config = { ...DEFAULT_CHROMA_OPTIONS, ...options };
   const { frameSize, hopSize } = config;
   const totalSamples = monoAudioData.length;
+  const audioDuration = totalSamples / sampleRate;
+
+  if (totalSamples === 0) {
+    return [];
+  }
 
   if (totalSamples < frameSize) {
     // Audio is shorter than a single analysis frame
     const singleSlice = new Float32Array(frameSize);
     singleSlice.set(monoAudioData);
-    const result = extractFrameChroma(singleSlice, sampleRate, null, config);
+    const result = extractFrameChroma(singleSlice, sampleRate, null, {
+      ...config,
+      actualSampleCount: totalSamples
+    });
     return [{
       time: 0,
+      actualEndTime: audioDuration,
+      actualSampleCount: totalSamples,
+      isPadded: true,
       chroma: result.chroma,
       rms: result.rms,
       isSilent: result.isSilent,
@@ -199,14 +216,18 @@ export async function extractChromagram(monoAudioData, sampleRate, options = {})
     }];
   }
 
-  const numFrames = Math.floor((totalSamples - frameSize) / hopSize) + 1;
+  const numFullFrames = Math.floor((totalSamples - frameSize) / hopSize) + 1;
+  const lastFullEndSample = (numFullFrames - 1) * hopSize + frameSize;
+  const hasTailFrame = lastFullEndSample < totalSamples;
+  const totalFramesCount = numFullFrames + (hasTailFrame ? 1 : 0);
+
   const frames = [];
   const analyzer = new FFTAnalyzer(frameSize);
   const frameBuffer = new Float32Array(frameSize);
 
   const BATCH_SIZE = 40; // Process 40 frames before yielding to main thread
 
-  for (let f = 0; f < numFrames; f++) {
+  for (let f = 0; f < numFullFrames; f++) {
     if (config.checkCancelled && config.checkCancelled()) {
       throw new Error('Analysis cancelled by user.');
     }
@@ -218,18 +239,55 @@ export async function extractChromagram(monoAudioData, sampleRate, options = {})
     const frameResult = extractFrameChroma(frameBuffer, sampleRate, analyzer, config);
     frames.push({
       time,
+      actualEndTime: (startSample + frameSize) / sampleRate,
+      actualSampleCount: frameSize,
+      isPadded: false,
       chroma: frameResult.chroma,
       rms: frameResult.rms,
       isSilent: frameResult.isSilent,
       spectralPeaks: frameResult.spectralPeaks || []
     });
 
-    if (f % BATCH_SIZE === 0 || f === numFrames - 1) {
+    if (f % BATCH_SIZE === 0 || f === numFullFrames - 1) {
       if (typeof config.onProgress === 'function') {
-        config.onProgress((f + 1) / numFrames);
+        config.onProgress((f + 1) / totalFramesCount);
       }
       // Yield to browser event loop
       await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
+
+  // Check for remaining tail audio that could not fit a complete additional FFT frame
+  if (hasTailFrame) {
+    if (config.checkCancelled && config.checkCancelled()) {
+      throw new Error('Analysis cancelled by user.');
+    }
+
+    const tailStartSample = numFullFrames * hopSize;
+    const tailSampleCount = totalSamples - tailStartSample;
+
+    frameBuffer.fill(0);
+    frameBuffer.set(monoAudioData.subarray(tailStartSample, totalSamples));
+    const tailTime = tailStartSample / sampleRate;
+
+    const tailResult = extractFrameChroma(frameBuffer, sampleRate, analyzer, {
+      ...config,
+      actualSampleCount: tailSampleCount
+    });
+
+    frames.push({
+      time: tailTime,
+      actualEndTime: audioDuration,
+      actualSampleCount: tailSampleCount,
+      isPadded: true,
+      chroma: tailResult.chroma,
+      rms: tailResult.rms,
+      isSilent: tailResult.isSilent,
+      spectralPeaks: tailResult.spectralPeaks || []
+    });
+
+    if (typeof config.onProgress === 'function') {
+      config.onProgress(1.0);
     }
   }
 

@@ -37,37 +37,65 @@ export const EVALUATION_CATEGORIES = {
  * Diagnoses differences between reference ground-truth annotations and detected chord predictions.
  * Employs consistent frame and segment references via getFrameDiagnosticsAtTime,
  * ensuring no measurements from unrelated timestamps are mixed together.
+ * Strictly clips analysis to the valid recording interval [0, audioDuration].
  */
-export function diagnoseMismatches(referenceSegments, detectedSegments, framePredictions) {
+export function diagnoseMismatches(referenceSegments, detectedSegments, framePredictions, options = {}) {
   const issues = [];
   const timeStep = 0.05;
-  const maxTime = Math.max(
-    ...referenceSegments.map(s => s.endTime),
-    ...detectedSegments.map(s => s.endTime)
-  );
 
+  const audioDuration = options.audioDuration !== undefined && options.audioDuration !== null && options.audioDuration > 0
+    ? options.audioDuration
+    : Math.max(...referenceSegments.map(s => s.endTime));
+
+  // Clip segments to valid recording interval [0, audioDuration]
+  const validRef = [];
+  for (const s of referenceSegments) {
+    const start = Math.max(0, Math.min(audioDuration, s.startTime));
+    const end = Math.max(0, Math.min(audioDuration, s.endTime));
+    if (end > start) {
+      validRef.push({ ...s, startTime: start, endTime: end });
+    }
+  }
+
+  const validDet = [];
+  if (detectedSegments) {
+    for (const s of detectedSegments) {
+      const start = Math.max(0, Math.min(audioDuration, s.startTime));
+      const end = Math.max(0, Math.min(audioDuration, s.endTime));
+      if (end > start) {
+        validDet.push({ ...s, startTime: start, endTime: end });
+      }
+    }
+  }
+
+  const steps = Math.floor(audioDuration / timeStep + 1e-9);
   let currentMismatch = null;
 
-  for (let t = 0; t < maxTime; t += timeStep) {
-    const ref = sampleSegmentAtTime(referenceSegments, t);
-    const det = sampleSegmentAtTime(detectedSegments, t);
+  for (let i = 0; i < steps; i++) {
+    const t = i * timeStep;
+    const nextT = Math.min(audioDuration, (i + 1) * timeStep);
+
+    const ref = sampleSegmentAtTime(validRef, t, audioDuration);
+    const det = sampleSegmentAtTime(validDet, t, audioDuration);
 
     if (ref.chord !== det.chord) {
       if (!currentMismatch) {
         currentMismatch = {
           startTime: parseFloat(t.toFixed(2)),
-          endTime: parseFloat((t + timeStep).toFixed(2)),
+          endTime: parseFloat(nextT.toFixed(2)),
           refChord: ref.chord,
-          detChord: det.chord
+          detChord: det.chord,
+          refStatus: ref.status,
+          detStatus: det.status
         };
       } else {
-        currentMismatch.endTime = parseFloat((t + timeStep).toFixed(2));
+        currentMismatch.endTime = parseFloat(nextT.toFixed(2));
       }
     } else {
       if (currentMismatch) {
         currentMismatch.duration = parseFloat((currentMismatch.endTime - currentMismatch.startTime).toFixed(2));
         const midTime = (currentMismatch.startTime + currentMismatch.endTime) / 2;
-        const diag = getFrameDiagnosticsAtTime(midTime, framePredictions, detectedSegments);
+        const diag = getFrameDiagnosticsAtTime(midTime, framePredictions, validDet);
         currentMismatch.diagnostic = diag;
         currentMismatch.frame = diag.frame;
         issues.push(currentMismatch);
@@ -79,7 +107,7 @@ export function diagnoseMismatches(referenceSegments, detectedSegments, framePre
   if (currentMismatch) {
     currentMismatch.duration = parseFloat((currentMismatch.endTime - currentMismatch.startTime).toFixed(2));
     const midTime = (currentMismatch.startTime + currentMismatch.endTime) / 2;
-    const diag = getFrameDiagnosticsAtTime(midTime, framePredictions, detectedSegments);
+    const diag = getFrameDiagnosticsAtTime(midTime, framePredictions, validDet);
     currentMismatch.diagnostic = diag;
     currentMismatch.frame = diag.frame;
     issues.push(currentMismatch);
@@ -111,6 +139,9 @@ export async function evaluateAudioFile(audioFilePath, annotationPath, options =
     const match = matchChord(f.chroma);
     return {
       time: f.time,
+      actualEndTime: f.actualEndTime,
+      actualSampleCount: f.actualSampleCount,
+      isPadded: f.isPadded,
       chord: f.isSilent ? 'N.C.' : match.chord,
       shortName: f.isSilent ? 'N.C.' : match.shortName,
       root: f.isSilent ? null : match.root,
@@ -123,7 +154,8 @@ export async function evaluateAudioFile(audioFilePath, annotationPath, options =
   });
 
   const detectedSegments = segmentChords(framePredictions, hopDuration, {
-    minSegmentDuration: 0.45
+    minSegmentDuration: 0.45,
+    audioDuration: duration
   });
 
   const isReal = annotation.category && Object.values(EVALUATION_CATEGORIES).some(c => c.id === annotation.category);
@@ -131,10 +163,13 @@ export async function evaluateAudioFile(audioFilePath, annotationPath, options =
 
   const metrics = computeChordMetrics(annotation.segments, detectedSegments, {
     datasetType,
-    trackTitle: annotation.fileName || path.basename(audioFilePath)
+    trackTitle: annotation.fileName || path.basename(audioFilePath),
+    audioDuration: duration
   });
 
-  const mismatches = diagnoseMismatches(annotation.segments, detectedSegments, framePredictions);
+  const mismatches = diagnoseMismatches(annotation.segments, detectedSegments, framePredictions, {
+    audioDuration: duration
+  });
 
   return { metrics, detectedSegments, referenceSegments: annotation.segments, mismatches, framePredictions };
 }
@@ -177,7 +212,7 @@ export async function runEvaluationSuite() {
   const runRecordings = !process.argv.includes('--synthetic-only');
 
   console.log('===============================================================');
-  console.log('       CHORDFINDER AUDIO EVALUATION RUNNER (PHASE 2.6)');
+  console.log('       CHORDFINDER AUDIO EVALUATION RUNNER (PHASE 2.7)');
   console.log('===============================================================\n');
 
   // Check 1: Synthetic Benchmarks in test/fixtures/

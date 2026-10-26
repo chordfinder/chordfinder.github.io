@@ -509,7 +509,9 @@ async function handleAnalyzeAudio() {
   const frameSize = 8192;
   const hopSize = 4096;
   const hopDuration = hopSize / sampleRate;
-  const totalFrames = Math.max(1, Math.floor((monoData.length - frameSize) / hopSize) + 1);
+  const numFull = Math.floor((monoData.length - frameSize) / hopSize) + 1;
+  const hasTail = ((numFull - 1) * hopSize + frameSize) < monoData.length;
+  const totalFrames = monoData.length < frameSize ? 1 : (numFull + (hasTail ? 1 : 0));
 
   try {
     const chromaFrames = await extractChromagram(monoData, sampleRate, {
@@ -547,6 +549,9 @@ async function handleAnalyzeAudio() {
       const match = matchChord(f.chroma);
       return {
         time: f.time,
+        actualEndTime: f.actualEndTime,
+        actualSampleCount: f.actualSampleCount,
+        isPadded: f.isPadded,
         chord: match.chord,
         shortName: match.shortName,
         root: match.root,
@@ -565,7 +570,8 @@ async function handleAnalyzeAudio() {
     currentFrameDiagnostics = smoothedFrames;
 
     const segments = segmentChords(rawFramePredictions, hopDuration, {
-      minSegmentDuration: 0.35
+      minSegmentDuration: 0.35,
+      audioDuration: duration
     });
 
     currentSegments = segments;

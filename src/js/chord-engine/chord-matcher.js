@@ -332,12 +332,13 @@ export function smoothFramePredictions(framePredictions, radius = 2) {
     const start = Math.max(0, i - radius);
     const end = Math.min(n - 1, i + radius);
 
-    // Weighted votes by score
+    // Weighted votes by score, giving silence and N.C. appropriate confidence
     const votes = new Map();
     for (let j = start; j <= end; j++) {
       const pred = framePredictions[j];
       const key = pred.chord;
-      const weight = (pred.score || 0.1) * (1.0 - Math.abs(i - j) * 0.15);
+      const conf = pred.isSilent ? 0.90 : (pred.chord === 'N.C.' ? 0.80 : (pred.score || 0.5));
+      const weight = conf * (1.0 - Math.abs(i - j) * 0.15);
       votes.set(key, (votes.get(key) || 0) + weight);
     }
 
@@ -404,6 +405,8 @@ export function segmentChords(frames, hopDuration = 0.093, options = {}) {
 
   for (let i = 0; i < smoothedFrames.length; i++) {
     const f = smoothedFrames[i];
+    const frameDefaultEnd = f.actualEndTime ?? (f.time + hopDuration);
+
     if (!currentSegment || currentSegment.chord !== f.chord) {
       if (currentSegment) {
         currentSegment.endTime = f.time;
@@ -417,19 +420,27 @@ export function segmentChords(frames, hopDuration = 0.093, options = {}) {
         root: f.root || null,
         quality: f.quality || 'none',
         startTime: f.time,
-        endTime: f.time + hopDuration,
-        duration: hopDuration,
+        endTime: frameDefaultEnd,
+        duration: Math.max(0.01, frameDefaultEnd - f.time),
         scoreSum: f.score || 0,
         frameCount: 1
       };
     } else {
       currentSegment.scoreSum += (f.score || 0);
       currentSegment.frameCount++;
-      currentSegment.endTime = f.time + hopDuration;
+      currentSegment.endTime = frameDefaultEnd;
     }
   }
 
   if (currentSegment) {
+    // If audioDuration is explicitly provided in options and supported by the final analysis
+    if (opts.audioDuration !== undefined && opts.audioDuration !== null && opts.audioDuration > 0) {
+      const audioDur = opts.audioDuration;
+      // Make endpoint equal to audioDuration only when supported by the final analysis
+      if (currentSegment.endTime < audioDur && (audioDur - currentSegment.endTime) <= hopDuration * 1.5) {
+        currentSegment.endTime = audioDur;
+      }
+    }
     currentSegment.duration = Math.max(0.01, currentSegment.endTime - currentSegment.startTime);
     currentSegment.similarityScore = currentSegment.scoreSum / currentSegment.frameCount;
     rawSegments.push(currentSegment);
@@ -437,7 +448,18 @@ export function segmentChords(frames, hopDuration = 0.093, options = {}) {
 
   // Step 3: Merge short segments that fall below minSegmentDuration
   const minDur = opts.minSegmentDuration;
-  if (rawSegments.length <= 1) return rawSegments;
+  if (rawSegments.length <= 1) {
+    return rawSegments.map(s => ({
+      chord: s.chord,
+      shortName: s.shortName,
+      root: s.root,
+      quality: s.quality,
+      startTime: parseFloat(s.startTime.toFixed(2)),
+      endTime: parseFloat(s.endTime.toFixed(2)),
+      duration: parseFloat((s.endTime - s.startTime).toFixed(2)),
+      similarityScore: parseFloat(s.similarityScore.toFixed(3))
+    }));
+  }
 
   const mergedSegments = [];
   let cursor = 0;
@@ -461,8 +483,12 @@ export function segmentChords(frames, hopDuration = 0.093, options = {}) {
         continue;
       }
 
-      // Otherwise merge with previous if present
-      if (prev) {
+      // Do NOT merge trailing silence into a preceding non-N.C. chord
+      // (preserves Requirement 4: If recording ends in silence, do not extend final chord over silence)
+      const isTrailingSilence = !next && seg.chord === 'N.C.' && prev && prev.chord !== 'N.C.';
+
+      // Otherwise merge with previous if present and not violating trailing silence constraint
+      if (prev && !isTrailingSilence) {
         prev.endTime = seg.endTime;
         prev.duration = prev.endTime - prev.startTime;
         prev.scoreSum += seg.scoreSum;
@@ -485,7 +511,7 @@ export function segmentChords(frames, hopDuration = 0.093, options = {}) {
     quality: s.quality,
     startTime: parseFloat(s.startTime.toFixed(2)),
     endTime: parseFloat(s.endTime.toFixed(2)),
-    duration: parseFloat(s.duration.toFixed(2)),
+    duration: parseFloat((s.endTime - s.startTime).toFixed(2)),
     similarityScore: parseFloat(s.similarityScore.toFixed(3))
   }));
 }
